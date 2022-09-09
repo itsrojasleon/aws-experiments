@@ -1,0 +1,44 @@
+service: e304ike230
+
+provider:
+  name: aws
+  runtime: nodejs16.x
+  stage: ${opt:stage, 'dev'}
+  environment:
+    SIMPLE_QUEUE_URL:
+      Fn::ImportValue: SimpleQueueUrl
+  iam:
+    role:
+      Fn::ImportValue: LambdaRoleArn
+
+functions:
+  call:
+    handler: src/lambdas/call.handler
+    events:
+      - http:
+          path: /call
+          method: get
+  fail:
+    name: failRightNow
+    handler: src/lambdas/fail.handler
+    events:
+      - sqs:
+          arn:
+            Fn::ImportValue: SimpleQueueArn
+          functionResponseType: ReportBatchItemFailures
+  retry:
+    handler: src/lambdas/retry.handler
+    name: retryRightNow
+    events:
+      - sqs:
+          arn:
+            Fn::ImportValue: RetryQueueArn
+          functionResponseType: ReportBatchItemFailures
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+
+plugins:
+  - serverless-esbuild

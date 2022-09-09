@@ -1,0 +1,29 @@
+service: lambda-tmp-dir
+
+provider:
+  name: aws
+  stage: dev
+  runtime: nodejs16.x
+
+functions:
+  writer:
+    handler: src/lambdas/writer.handler
+    events:
+      - httpApi:
+          path: /writer
+          method: post
+  reader:
+    handler: src/lambdas/reader.handler
+    events:
+      - httpApi:
+          path: /reader
+          method: get
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
+
+plugins:
+  - serverless-offline
+  - serverless-esbuild

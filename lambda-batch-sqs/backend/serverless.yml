@@ -1,0 +1,42 @@
+service: lambda-sqs-long-polling
+
+configValidationMode: error
+
+useDotenv: true
+
+provider:
+  name: aws
+  stage: dev
+  runtime: nodejs16.x
+  iam:
+    role:
+      Fn::ImportValue: lambdaRoleArn
+  environment:
+    COOL_QUEUE_URL:
+      Fn::ImportValue: coolQueueUrl
+
+functions:
+  call:
+    handler: src/call.handler
+    events:
+      - http:
+          method: get
+          path: /call
+  process:
+    handler: src/process.handler
+    name: process
+    events:
+      - sqs:
+          arn:
+            Fn::ImportValue: coolQueueArn
+          functionResponseType: ReportBatchItemFailures
+          batchSize: 20
+          maximumBatchingWindow: 20
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true
