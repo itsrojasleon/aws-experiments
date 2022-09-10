@@ -1,1 +1,6 @@
+node_modules
+.serverless
+.esbuild
 .DS_Store
+
+.env

@@ -1,8 +1,6 @@
-service: lambda-sqs-long-polling
+service: lambda-batch-sqs
 
 configValidationMode: error
-
-useDotenv: true
 
 provider:
   name: aws
