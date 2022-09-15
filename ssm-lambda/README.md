@@ -1,12 +1,5 @@
-# Welcome to your CDK Go project!
+# SSM Lambda
 
-This is a blank project for CDK development with Go.
-
-The `cdk.json` file tells the CDK toolkit how to execute your app.
-
-## Useful commands
-
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
- * `go test`         run unit tests
+- I thought the ssm parameter will be the updated one. But nope.
+- I need to bundle the backend again to take the latest ssm parameter.
+- Not the solution I'm looking for.

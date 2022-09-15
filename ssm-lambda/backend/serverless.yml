@@ -1,0 +1,29 @@
+service: ssm-lambda-backend
+
+configValidationMode: error
+
+provider:
+  name: aws
+  stage: dev
+  runtime: nodejs16.x
+  # iam:
+  #   role:
+  #     Fn::ImportValue: lambdaRoleArn
+  environment:
+    COOL_PARAM: ${ssm:/cool/param}
+
+functions:
+  call:
+    handler: src/check.handler
+    events:
+      - http:
+          method: get
+          path: /
+
+plugins:
+  - serverless-esbuild
+
+custom:
+  esbuild:
+    bundle: true
+    minify: true

@@ -4,9 +4,6 @@ import (
 	"os"
 
 	"github.com/aws/aws-cdk-go/awscdk/v2"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
-	"github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
 	"github.com/aws/aws-cdk-go/awscdk/v2/awsssm"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
@@ -23,37 +20,32 @@ func NewSsmLambdaCronStack(scope constructs.Construct, id string, props *SsmLamb
 	}
 	stack := awscdk.NewStack(scope, &id, &sprops)
 
-	parameter := awsssm.NewStringParameter(stack, jsii.String("coolParam"), &awsssm.StringParameterProps{
+	awsssm.NewStringParameter(stack, jsii.String("coolParam"), &awsssm.StringParameterProps{
 		StringValue:   jsii.String("Hi there"),
-		ParameterName: jsii.String("/coolParam"),
+		ParameterName: jsii.String("/cool/param"),
 		Type:          awsssm.ParameterType_STRING,
 		Tier:          awsssm.ParameterTier_STANDARD,
 	})
 
-	policy := awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
-		Actions:   &[]*string{jsii.String("ssm:*")},
-		Resources: &[]*string{jsii.String("*")},
-	})
+	// role := awsiam.NewRole(stack, jsii.String("lambdaRole"), &awsiam.RoleProps{
+	// 	AssumedBy: awsiam.NewServicePrincipal(
+	// 		jsii.String("lambda.amazonaws.com"),
+	// 		&awsiam.ServicePrincipalOpts{},
+	// 	),
+	// })
 
-	fn := awslambdanodejs.NewNodejsFunction(stack, jsii.String("lambdaCron"), &awslambdanodejs.NodejsFunctionProps{
-		Runtime: awslambda.Runtime_NODEJS_16_X(),
-		Handler: jsii.String("handler"),
-		Entry:   jsii.String("./src/lambdas/check.ts"),
-		Environment: &map[string]*string{
-			"PARAM_NAME": parameter.ParameterName(),
-		},
-		Bundling: &awslambdanodejs.BundlingOptions{
-			Minify: jsii.Bool(true),
-		},
-	})
+	// role.AddToPolicy(
+	// 	awsiam.NewPolicyStatement(&awsiam.PolicyStatementProps{
+	// 		Effect:    awsiam.Effect_ALLOW,
+	// 		Resources: &[]*string{jsii.String("*")},
+	// 		Actions:   &[]*string{jsii.String("ssm:*")},
+	// 	}),
+	// )
 
-	fn.Role().AttachInlinePolicy(
-		awsiam.NewPolicy(stack, jsii.String("ssm-policy"), &awsiam.PolicyProps{
-			Statements: &[]awsiam.PolicyStatement{
-				policy,
-			},
-		}),
-	)
+	// awscdk.NewCfnOutput(stack, jsii.String("policySSM"), &awscdk.CfnOutputProps{
+	// 	Value:      role.RoleArn(),
+	// 	ExportName: jsii.String("lambdaRoleArn"),
+	// })
 
 	return stack
 }
