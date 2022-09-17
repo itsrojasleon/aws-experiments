@@ -4,9 +4,6 @@ export interface Product {
   price: number;
 }
 
-/**
- * Product request being save within s3 bucket in json format.
- */
 export interface ProductRequest {
   productId: string;
   reason: 'question' | 'purchase';

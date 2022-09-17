@@ -1,0 +1,19 @@
+lockfileVersion: 5.4
+
+specifiers:
+  '@types/aws-lambda': ^8.10.104
+  '@types/node': ^18.7.18
+
+devDependencies:
+  '@types/aws-lambda': 8.10.104
+  '@types/node': 18.7.18
+
+packages:
+
+  /@types/aws-lambda/8.10.104:
+    resolution: {integrity: sha512-HXZJH8aBa06re9NCtFudOr21izYZycgXIVjd8vFBSNSf6Ca4GYD77TfKqwYgcDqv4olqj5KK+Ks7Xi5IXFbNGA==}
+    dev: true
+
+  /@types/node/18.7.18:
+    resolution: {integrity: sha512-m+6nTEOadJZuTPkKR/SYK3A2d7FZrgElol9UP1Kae90VVU4a6mxnPuLiIW1m4Cq4gZ/nWb9GrdVXJCoCazDAbg==}
+    dev: true

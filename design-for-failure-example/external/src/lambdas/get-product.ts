@@ -1,7 +1,7 @@
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { Product } from '../types';
+import { Product } from '../../../common/types';
 
-export const getProduct: APIGatewayProxyHandler = async (event) => {
+export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     if (!event.pathParameters?.id) {
       throw new Error('Must provide a product id');
