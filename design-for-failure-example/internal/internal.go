@@ -25,78 +25,74 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 
 	bucket := s3.NewBucket(stack, jsii.String("bucket"), &s3.BucketProps{})
 
+	obtaitingProductDLQ := sqs.NewQueue(
+		stack,
+		jsii.String("obtaitingProductDLQ"),
+		&sqs.QueueProps{
+			// In a real scenario use more time.
+			// And consider minutes instead of seconds.
+			DeliveryDelay: cdk.Duration_Seconds(jsii.Number(5)),
+		},
+	)
+	obtaitingProductQueue := sqs.NewQueue(stack, jsii.String("obtaitingProductQueue"), &sqs.QueueProps{
+		DeadLetterQueue: &sqs.DeadLetterQueue{
+			MaxReceiveCount: jsii.Number(1),
+			Queue:           obtaitingProductDLQ,
+		},
+	})
 	requestRedirectionQueue := sqs.NewQueue(stack, jsii.String("requestRedirectionQueue"), &sqs.QueueProps{})
-	questionHandlerQueue := sqs.NewQueue(stack, jsii.String("questionHandlerQueue"), &sqs.QueueProps{})
 	purchaseHandlerQueue := sqs.NewQueue(stack, jsii.String("purchaseHandlerQueue"), &sqs.QueueProps{})
-	externalApiHealthMonitoringHandlerDLQ := sqs.NewQueue(
-		stack,
-		jsii.String("externalApiHealthMonitoringHandlerDLQ"),
-		&sqs.QueueProps{
-			DeliveryDelay: cdk.Duration_Seconds(jsii.Number(15)), // Change to 15 minutes in prod.
-		},
-	)
-	externalApiHealthMonitoringQueue := sqs.NewQueue(
-		stack,
-		jsii.String("externalApiHealthMonitoringQueue"),
-		&sqs.QueueProps{
-			DeadLetterQueue: &sqs.DeadLetterQueue{
-				Queue:           externalApiHealthMonitoringHandlerDLQ,
-				MaxReceiveCount: jsii.Number(5),
-			},
-		},
-	)
+	questionHandlerQueue := sqs.NewQueue(stack, jsii.String("questionHandlerQueue"), &sqs.QueueProps{})
+	purchaseOfflineHandlerQueue := sqs.NewQueue(stack, jsii.String("purchaseOfflineHandlerQueue"), &sqs.QueueProps{})
+	questionOfflineHandlerQueue := sqs.NewQueue(stack, jsii.String("questionOfflineHandlerQueue"), &sqs.QueueProps{})
 
 	lambdanodejs.NewNodejsFunction(
 		stack,
 		jsii.String("createRequestFn"),
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/create-request.ts"),
+			Entry:   jsii.String("./src/lambdas/create-request.ts"),
 			Environment: &map[string]*string{
-				"BUCKET_NAME":                bucket.BucketName(),
-				"REQUEST_CREATION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
-				"QUESTION_HANDLER_QUEUE_URL": questionHandlerQueue.QueueUrl(),
-				"PURCHASE_HANDLER_QUEUE_URL": purchaseHandlerQueue.QueueUrl(),
+				"BUCKET_NAME":                 bucket.BucketName(),
+				"OBTAINING_PRODUCT_QUEUE_URL": obtaitingProductQueue.QueueUrl(),
 			},
 		},
 	)
 
-	monitorExternalApiHealthFn := lambdanodejs.NewNodejsFunction(
+	getProductFn := lambdanodejs.NewNodejsFunction(
 		stack,
-		jsii.String("monitorExternalApiHealthFn"),
+		jsii.String("getProductFn"),
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/monitor-external-api-health.ts"),
+			Entry:   jsii.String("./src/lambdas/get-product.ts"),
 			Environment: &map[string]*string{
-				"MONITOR_HEALTH_FN_URL": cdk.Fn_ImportValue(jsii.String("monitorHealthFnUrl")),
+				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
+				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
 			},
 		},
 	)
-
-	monitorExternalApiHealthFn.AddEventSource(
+	getProductFn.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
-			externalApiHealthMonitoringQueue,
+			obtaitingProductQueue,
 			&lambdaeventsources.SqsEventSourceProps{
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),
 	)
-
-	retryMonitorExternalApiHealthFn := lambdanodejs.NewNodejsFunction(
+	getProductOfflineFn := lambdanodejs.NewNodejsFunction(
 		stack,
-		jsii.String("retryMonitorExternalApiHealthFn"),
+		jsii.String("getProductOfflineFn"),
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/retry-monitor-external-api-health.ts"),
+			Entry:   jsii.String("./src/lambdas/offline/get-product.ts"),
 			Environment: &map[string]*string{
-				"MONITOR_HEALTH_FN_URL": cdk.Fn_ImportValue(jsii.String("monitorHealthFnUrl")),
+				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
+				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
 			},
-			Timeout: cdk.Duration_Seconds(jsii.Number(5)),
 		},
 	)
-
-	retryMonitorExternalApiHealthFn.AddEventSource(
+	getProductOfflineFn.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
-			externalApiHealthMonitoringHandlerDLQ,
+			obtaitingProductDLQ,
 			&lambdaeventsources.SqsEventSourceProps{
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),
@@ -107,34 +103,19 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		jsii.String("redirectRequestFn"),
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/redirect-request.ts"),
+			Entry:   jsii.String("./src/lambdas/redirect-request.ts"),
 			Environment: &map[string]*string{
-				"BUCKET_NAME":        bucket.BucketName(),
-				"GET_PRODUCT_FN_URL": cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
+				"BUCKET_NAME":                       bucket.BucketName(),
+				"HANDLE_PURCHASE_QUEUE_URL":         purchaseHandlerQueue.QueueUrl(),
+				"HANDLE_QUESTION_QUEUE_URL":         questionHandlerQueue.QueueUrl(),
+				"HANDLE_OFFLINE_PURCHASE_QUEUE_URL": purchaseOfflineHandlerQueue.QueueUrl(),
+				"HANDLE_OFFLINE_QUESTION_QUEUE_URL": questionOfflineHandlerQueue.QueueUrl(),
 			},
 		},
 	)
-
 	redirectRequestFn.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
 			requestRedirectionQueue,
-			&lambdaeventsources.SqsEventSourceProps{
-				ReportBatchItemFailures: jsii.Bool(true),
-			}),
-	)
-
-	handleQuestionFn := lambdanodejs.NewNodejsFunction(
-		stack,
-		jsii.String("handleQuestionFn"),
-		&lambdanodejs.NodejsFunctionProps{
-			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/handle-question.ts"),
-		},
-	)
-
-	handleQuestionFn.AddEventSource(
-		lambdaeventsources.NewSqsEventSource(
-			questionHandlerQueue,
 			&lambdaeventsources.SqsEventSourceProps{
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),
@@ -145,13 +126,61 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		jsii.String("handlePurchaseFn"),
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/internal/handle-purchase.ts"),
+			Entry:   jsii.String("./src/lambdas/handle-purchase.ts"),
 		},
 	)
-
 	handlePurchaseFn.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
 			purchaseHandlerQueue,
+			&lambdaeventsources.SqsEventSourceProps{
+				ReportBatchItemFailures: jsii.Bool(true),
+			}),
+	)
+
+	handleQuestionFn := lambdanodejs.NewNodejsFunction(
+		stack,
+		jsii.String("handleQuestionFn"),
+		&lambdanodejs.NodejsFunctionProps{
+			Handler: jsii.String("handler"),
+			Entry:   jsii.String("./src/lambdas/handle-question.ts"),
+		},
+	)
+	handleQuestionFn.AddEventSource(
+		lambdaeventsources.NewSqsEventSource(
+			questionHandlerQueue,
+			&lambdaeventsources.SqsEventSourceProps{
+				ReportBatchItemFailures: jsii.Bool(true),
+			}),
+	)
+
+	handleOfflinePurchaseFn := lambdanodejs.NewNodejsFunction(
+		stack,
+		jsii.String("handleOfflinePurchaseFn"),
+		&lambdanodejs.NodejsFunctionProps{
+			Handler: jsii.String("handler"),
+			Entry:   jsii.String("./src/lambdas/offline/handle-purchase.ts"),
+		},
+	)
+	handleOfflinePurchaseFn.AddEventSource(
+		lambdaeventsources.NewSqsEventSource(
+			purchaseOfflineHandlerQueue,
+			&lambdaeventsources.SqsEventSourceProps{
+				BatchSize:               jsii.Number(500),
+				ReportBatchItemFailures: jsii.Bool(true),
+			}),
+	)
+
+	handleOfflineQuestionFn := lambdanodejs.NewNodejsFunction(
+		stack,
+		jsii.String("handleOfflineQuestionFn"),
+		&lambdanodejs.NodejsFunctionProps{
+			Handler: jsii.String("handler"),
+			Entry:   jsii.String("./src/lambdas/offline/handle-question.ts"),
+		},
+	)
+	handleOfflineQuestionFn.AddEventSource(
+		lambdaeventsources.NewSqsEventSource(
+			questionOfflineHandlerQueue,
 			&lambdaeventsources.SqsEventSourceProps{
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),

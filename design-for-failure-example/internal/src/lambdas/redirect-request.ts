@@ -1,13 +1,8 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { SQSBatchResponse, SQSHandler } from 'aws-lambda';
-import axios from 'axios';
 import { consumers, Readable } from 'stream';
-import {
-  GetProductsEvent,
-  Product,
-  ProductRequest
-} from '../../../common/types';
+import { ProductRequest, RedirectRequestEvent } from '../../../common/types';
 import { s3, sqs } from '../clients';
 
 export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
@@ -15,7 +10,9 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
 
   const promises = event.Records.map(async (record) => {
     try {
-      const { bucketPath }: GetProductsEvent = JSON.parse(record.body);
+      const { bucketPath, product, offline }: RedirectRequestEvent = JSON.parse(
+        record.body
+      );
 
       const { Body } = await s3.send(
         new GetObjectCommand({
@@ -24,27 +21,27 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
         })
       );
 
-      const readableBody = Body as Readable;
-      const { productId, reason } = (await consumers.json(
-        readableBody
-      )) as ProductRequest;
+      const rBody = Body as Readable;
+      const { reason } = (await consumers.json(rBody)) as ProductRequest;
 
-      const { data } = await axios.get<Product>(
-        `${process.env.GET_PRODUCT_FN_URL!}/${productId}`
-      );
-
-      if (reason === 'question') {
+      if (offline) {
         await sqs.send(
           new SendMessageCommand({
-            QueueUrl: process.env.QUESTION_HANDLER_QUEUE_URL,
-            MessageBody: JSON.stringify(data)
+            QueueUrl:
+              reason === 'purchase'
+                ? process.env.HANDLE_OFFLINE_PURCHASE_QUEUE_URL
+                : process.env.HANDLE_OFFLINE_QUESTION_QUEUE_URL,
+            MessageBody: JSON.stringify({ product, offline })
           })
         );
       } else {
         await sqs.send(
           new SendMessageCommand({
-            QueueUrl: process.env.PURCHASE_HANDLER_QUEUE_URL,
-            MessageBody: JSON.stringify(data)
+            QueueUrl:
+              reason === 'purchase'
+                ? process.env.HANDLE_PURCHASE_QUEUE_URL
+                : process.env.HANDLE_QUESTION_QUEUE_URL,
+            MessageBody: JSON.stringify({ product })
           })
         );
       }
@@ -54,7 +51,6 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
   });
 
   await Promise.allSettled(promises);
-
   return {
     batchItemFailures: failedMessageIds.map((id) => ({ itemIdentifier: id }))
   };

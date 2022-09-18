@@ -32,32 +32,14 @@ func NewExternalStack(scope constructs.Construct, id string, props *ExternalStac
 			},
 		},
 	)
-	monitorHealthFn := lambdanodejs.NewNodejsFunction(
-		stack,
-		jsii.String("monitorHealthFn"),
-		&lambdanodejs.NodejsFunctionProps{
-			Handler: jsii.String("handler"),
-			Entry:   jsii.String("./src/lambdas/monitor-health.ts"),
-			Bundling: &lambdanodejs.BundlingOptions{
-				Minify: jsii.Bool(true),
-			},
-		},
-	)
 
 	getProductFnUrl := getProductFn.AddFunctionUrl(&lambda.FunctionUrlOptions{
-		AuthType: lambda.FunctionUrlAuthType_NONE,
-	})
-	monitorHealthFnUrl := monitorHealthFn.AddFunctionUrl(&lambda.FunctionUrlOptions{
 		AuthType: lambda.FunctionUrlAuthType_NONE,
 	})
 
 	cdk.NewCfnOutput(stack, jsii.String("getProductFnUrl"), &cdk.CfnOutputProps{
 		Value:      getProductFnUrl.Url(),
 		ExportName: jsii.String("externalApiUrl"),
-	})
-	cdk.NewCfnOutput(stack, jsii.String("monitorHealthFnUrl"), &cdk.CfnOutputProps{
-		Value:      monitorHealthFnUrl.Url(),
-		ExportName: jsii.String("monitorHealthFnUrl"),
 	})
 
 	return stack

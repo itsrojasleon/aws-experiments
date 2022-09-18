@@ -9,6 +9,13 @@ export interface ProductRequest {
   reason: 'question' | 'purchase';
 }
 
-export interface GetProductsEvent {
+export interface HandleRequestEvent {
+  productId: string;
   bucketPath: string;
+}
+
+export interface RedirectRequestEvent {
+  product: Product;
+  bucketPath: string;
+  offline: boolean;
 }
