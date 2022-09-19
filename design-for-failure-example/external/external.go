@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	apigateway "github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	lambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
 	"github.com/aws/constructs-go/constructs/v10"
@@ -21,6 +22,8 @@ func NewExternalStack(scope constructs.Construct, id string, props *ExternalStac
 	}
 	stack := cdk.NewStack(scope, &id, &sprops)
 
+	externalApi := apigateway.NewRestApi(stack, jsii.String("externalApi"), &apigateway.RestApiProps{})
+
 	getProductFn := lambdanodejs.NewNodejsFunction(
 		stack,
 		jsii.String("getProductFn"),
@@ -34,13 +37,17 @@ func NewExternalStack(scope constructs.Construct, id string, props *ExternalStac
 		},
 	)
 
-	getProductFnUrl := getProductFn.AddFunctionUrl(&lambda.FunctionUrlOptions{
-		AuthType: lambda.FunctionUrlAuthType_NONE,
-	})
+	api := externalApi.Root().AddResource(jsii.String("api"), &apigateway.ResourceOptions{})
+	productApi := api.AddResource(jsii.String("{id}"), &apigateway.ResourceOptions{})
+	productApi.AddMethod(
+		jsii.String("GET"),
+		apigateway.NewLambdaIntegration(getProductFn, &apigateway.LambdaIntegrationOptions{}),
+		api.DefaultMethodOptions(),
+	)
 
-	cdk.NewCfnOutput(stack, jsii.String("getProductFnUrl"), &cdk.CfnOutputProps{
-		Value:      getProductFnUrl.Url(),
-		ExportName: jsii.String("getProductFnUrl"),
+	cdk.NewCfnOutput(stack, jsii.String("externalApiUrl"), &cdk.CfnOutputProps{
+		Value:      externalApi.Url(),
+		ExportName: jsii.String("externalApiUrl"),
 	})
 
 	return stack

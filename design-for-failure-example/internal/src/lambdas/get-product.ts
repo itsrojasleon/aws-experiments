@@ -18,7 +18,7 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
       );
 
       const { data: product } = await axios.get<Product>(
-        `${process.env.GET_PRODUCT_FN_URL!}/${productId}`
+        `${process.env.EXTERNAL_API_URL!}/api/${productId}`
       );
 
       const msgBody: RedirectRequestEvent = {

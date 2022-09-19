@@ -4,6 +4,8 @@ import (
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	apigateway "github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
+	iam "github.com/aws/aws-cdk-go/awscdk/v2/awsiam"
 	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	lambdaeventsources "github.com/aws/aws-cdk-go/awscdk/v2/awslambdaeventsources"
 	lambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
@@ -26,13 +28,20 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 
 	bucket := s3.NewBucket(stack, jsii.String("bucket"), &s3.BucketProps{})
 
+	sqsPolicy := iam.NewPolicyStatement(&iam.PolicyStatementProps{
+		Actions:   &[]*string{jsii.String("sqs:SendMessage")},
+		Resources: &[]*string{jsii.String("*")},
+	})
+
+	internalApi := apigateway.NewRestApi(stack, jsii.String("internalApi"), &apigateway.RestApiProps{})
+
 	obtaitingProductDLQ := sqs.NewQueue(
 		stack,
 		jsii.String("obtaitingProductDLQ"),
 		&sqs.QueueProps{
 			// In a real scenario use more time.
 			// And consider minutes instead of seconds.
-			DeliveryDelay: cdk.Duration_Seconds(jsii.Number(5)),
+			DeliveryDelay: cdk.Duration_Seconds(jsii.Number(10)),
 		},
 	)
 	obtaitingProductQueue := sqs.NewQueue(stack, jsii.String("obtaitingProductQueue"), &sqs.QueueProps{
@@ -47,7 +56,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 	purchaseOfflineHandlerQueue := sqs.NewQueue(stack, jsii.String("purchaseOfflineHandlerQueue"), &sqs.QueueProps{})
 	questionOfflineHandlerQueue := sqs.NewQueue(stack, jsii.String("questionOfflineHandlerQueue"), &sqs.QueueProps{})
 
-	lambdanodejs.NewNodejsFunction(
+	createRequestFn := lambdanodejs.NewNodejsFunction(
 		stack,
 		jsii.String("createRequestFn"),
 		&lambdanodejs.NodejsFunctionProps{
@@ -61,6 +70,11 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		},
 	)
 
+	bucket.GrantReadWrite(createRequestFn)
+	createRequestFn.Role().AttachInlinePolicy(iam.NewPolicy(stack, jsii.String("sqsPolicy"), &iam.PolicyProps{
+		Statements: &[]iam.PolicyStatement{sqsPolicy},
+	}))
+
 	getProductFn := lambdanodejs.NewNodejsFunction(
 		stack,
 		jsii.String("getProductFn"),
@@ -69,7 +83,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 			Entry:   jsii.String("./src/lambdas/get-product.ts"),
 			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
-				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
+				"EXTERNAL_API_URL":              cdk.Fn_ImportValue(jsii.String("externalApiUrl")),
 				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
 			},
 		},
@@ -89,7 +103,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 			Entry:   jsii.String("./src/lambdas/offline/get-product.ts"),
 			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
-				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
+				"EXTERNAL_API_URL":              cdk.Fn_ImportValue(jsii.String("externalApiUrl")),
 				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
 			},
 		},
@@ -193,6 +207,14 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 			&lambdaeventsources.SqsEventSourceProps{
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),
+	)
+
+	api := internalApi.Root().AddResource(jsii.String("api"), &apigateway.ResourceOptions{})
+	createRequestApi := api.AddResource(jsii.String("create-request"), &apigateway.ResourceOptions{})
+	createRequestApi.AddMethod(
+		jsii.String("POST"),
+		apigateway.NewLambdaIntegration(createRequestFn, &apigateway.LambdaIntegrationOptions{}),
+		api.DefaultMethodOptions(),
 	)
 
 	return stack
