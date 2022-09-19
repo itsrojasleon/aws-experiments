@@ -16,7 +16,7 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
 
       // Send SQS message to lambda.
 
-      // Lambda will list objects, push them
+      // Lambda will list objects, push them.
     } catch (error) {
       failedMessageIds.push(record.messageId);
     }

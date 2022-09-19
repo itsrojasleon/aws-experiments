@@ -27,6 +27,7 @@ func NewExternalStack(scope constructs.Construct, id string, props *ExternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/get-product.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Bundling: &lambdanodejs.BundlingOptions{
 				Minify: jsii.Bool(true),
 			},
@@ -39,7 +40,7 @@ func NewExternalStack(scope constructs.Construct, id string, props *ExternalStac
 
 	cdk.NewCfnOutput(stack, jsii.String("getProductFnUrl"), &cdk.CfnOutputProps{
 		Value:      getProductFnUrl.Url(),
-		ExportName: jsii.String("externalApiUrl"),
+		ExportName: jsii.String("getProductFnUrl"),
 	})
 
 	return stack

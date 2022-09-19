@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	lambdaeventsources "github.com/aws/aws-cdk-go/awscdk/v2/awslambdaeventsources"
 	lambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
 	s3 "github.com/aws/aws-cdk-go/awscdk/v2/awss3"
@@ -52,6 +53,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/create-request.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
 				"BUCKET_NAME":                 bucket.BucketName(),
 				"OBTAINING_PRODUCT_QUEUE_URL": obtaitingProductQueue.QueueUrl(),
@@ -65,6 +67,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/get-product.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
 				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
 				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
@@ -84,6 +87,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/offline/get-product.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
 				"GET_PRODUCT_FN_URL":            cdk.Fn_ImportValue(jsii.String("getProductFnUrl")),
 				"REQUEST_REDIRECTION_QUEUE_URL": requestRedirectionQueue.QueueUrl(),
@@ -104,6 +108,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/redirect-request.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 			Environment: &map[string]*string{
 				"BUCKET_NAME":                       bucket.BucketName(),
 				"HANDLE_PURCHASE_QUEUE_URL":         purchaseHandlerQueue.QueueUrl(),
@@ -127,6 +132,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/handle-purchase.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 		},
 	)
 	handlePurchaseFn.AddEventSource(
@@ -143,6 +149,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/handle-question.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 		},
 	)
 	handleQuestionFn.AddEventSource(
@@ -159,13 +166,14 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/offline/handle-purchase.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 		},
 	)
 	handleOfflinePurchaseFn.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
 			purchaseOfflineHandlerQueue,
 			&lambdaeventsources.SqsEventSourceProps{
-				BatchSize:               jsii.Number(500),
+				BatchSize:               jsii.Number(10),
 				ReportBatchItemFailures: jsii.Bool(true),
 			}),
 	)
@@ -176,6 +184,7 @@ func NewInternalStack(scope constructs.Construct, id string, props *InternalStac
 		&lambdanodejs.NodejsFunctionProps{
 			Handler: jsii.String("handler"),
 			Entry:   jsii.String("./src/lambdas/offline/handle-question.ts"),
+			Runtime: lambda.Runtime_NODEJS_16_X(),
 		},
 	)
 	handleOfflineQuestionFn.AddEventSource(

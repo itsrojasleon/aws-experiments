@@ -12,7 +12,7 @@ specifiers:
 dependencies:
   '@aws-sdk/client-s3': 3.171.0
   '@aws-sdk/client-sqs': 3.171.0
-  '@aws-sdk/lib-storage': 3.171.0_@aws-sdk+client-s3@3.171.0
+  '@aws-sdk/lib-storage': 3.171.0_hneimngdnchz4bgdalnr66kf5u
   axios: 0.27.2
 
 devDependencies:
@@ -494,13 +494,14 @@ packages:
       tslib: 2.4.0
     dev: false
 
-  /@aws-sdk/lib-storage/3.171.0_@aws-sdk+client-s3@3.171.0:
+  /@aws-sdk/lib-storage/3.171.0_hneimngdnchz4bgdalnr66kf5u:
     resolution: {integrity: sha512-CGx1yt1WgGXuAdjGrY/ibsKoAWZvpI/lXxr9Vbsp80Ud035FKHOo/kfCGx2A9S1RltiAfsgpGk1KlF7O8OYX+g==}
     engines: {node: '>= 12.0.0'}
     peerDependencies:
       '@aws-sdk/abort-controller': ^3.0.0
       '@aws-sdk/client-s3': ^3.0.0
     dependencies:
+      '@aws-sdk/abort-controller': 3.171.0
       '@aws-sdk/client-s3': 3.171.0
       '@aws-sdk/smithy-client': 3.171.0
       buffer: 5.6.0

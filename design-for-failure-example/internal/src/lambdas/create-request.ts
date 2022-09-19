@@ -1,19 +1,15 @@
 import { SendMessageCommand } from '@aws-sdk/client-sqs';
 import { Upload } from '@aws-sdk/lib-storage';
 import { APIGatewayProxyHandler } from 'aws-lambda';
-import { HandleRequestEvent, ProductRequest } from '../../../common/types';
+import { HandleRequestEvent } from '../../../common/types';
 import { s3, sqs } from '../clients';
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
-    const { productId, reason }: ProductRequest = JSON.parse(event.body ?? '');
+    const reasons = ['question', 'purchase'];
 
-    if (!productId || !reason) {
-      throw new Error('Must provide productId and message properties');
-    }
-    if (reason !== 'purchase' && reason !== 'question') {
-      throw new Error(`reason must be "purchase" or "question"`);
-    }
+    const reason = reasons[Math.round(Math.random())];
+    const productId = '1';
 
     const bucketPath = `requests/${(Math.random() + 1)
       .toString(36)
