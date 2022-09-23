@@ -5,8 +5,10 @@ specifiers:
   '@aws-sdk/client-sqs': ^3.171.0
   '@aws-sdk/lib-storage': ^3.171.0
   '@types/aws-lambda': ^8.10.104
+  '@types/combined-stream': ^1.0.3
   '@types/node': ^18.7.18
   archiver: ^5.3.1
+  combined-stream: ^1.0.8
   esbuild: ^0.15.9
 
 dependencies:
@@ -14,9 +16,11 @@ dependencies:
   '@aws-sdk/client-sqs': 3.171.0
   '@aws-sdk/lib-storage': 3.171.0_@aws-sdk+client-s3@3.171.0
   archiver: 5.3.1
+  combined-stream: 1.0.8
 
 devDependencies:
   '@types/aws-lambda': 8.10.104
+  '@types/combined-stream': 1.0.3
   '@types/node': 18.7.18
   esbuild: 0.15.9
 
@@ -990,6 +994,12 @@ packages:
     resolution: {integrity: sha512-HXZJH8aBa06re9NCtFudOr21izYZycgXIVjd8vFBSNSf6Ca4GYD77TfKqwYgcDqv4olqj5KK+Ks7Xi5IXFbNGA==}
     dev: true
 
+  /@types/combined-stream/1.0.3:
+    resolution: {integrity: sha512-rU54Qy0+23b3xsXhBtHfx+M4lsRLllU2bnUnkS9hm3HAQ2Xt9q3QCYFxYVeaSG2mpCD8uuOGIEpcXHXDNZTa9w==}
+    dependencies:
+      '@types/node': 18.7.18
+    dev: true
+
   /@types/node/18.7.18:
     resolution: {integrity: sha512-m+6nTEOadJZuTPkKR/SYK3A2d7FZrgElol9UP1Kae90VVU4a6mxnPuLiIW1m4Cq4gZ/nWb9GrdVXJCoCazDAbg==}
     dev: true
@@ -1071,6 +1081,13 @@ packages:
       ieee754: 1.2.1
     dev: false
 
+  /combined-stream/1.0.8:
+    resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
+    engines: {node: '>= 0.8'}
+    dependencies:
+      delayed-stream: 1.0.0
+    dev: false
+
   /compress-commons/4.1.1:
     resolution: {integrity: sha512-QLdDLCKNV2dtoTorqgxngQCMA+gWXkM/Nwu7FpeBhk/RdkzimqC3jueb/FDmaZeXh+uby1jkBqE3xArsLBE5wQ==}
     engines: {node: '>= 10'}
@@ -1101,6 +1118,11 @@ packages:
     dependencies:
       crc-32: 1.2.2
       readable-stream: 3.6.0
+    dev: false
+
+  /delayed-stream/1.0.0:
+    resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
+    engines: {node: '>=0.4.0'}
     dev: false
 
   /end-of-stream/1.4.4:

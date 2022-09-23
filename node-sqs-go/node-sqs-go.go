@@ -9,7 +9,6 @@ import (
 	lambdanode "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
 	s3 "github.com/aws/aws-cdk-go/awscdk/v2/awss3"
 	sqs "github.com/aws/aws-cdk-go/awscdk/v2/awssqs"
-	lambdago "github.com/aws/aws-cdk-go/awscdklambdagoalpha/v2"
 	"github.com/aws/constructs-go/constructs/v10"
 	"github.com/aws/jsii-runtime-go"
 )
@@ -48,39 +47,75 @@ func NewNodeSqsGoStack(scope constructs.Construct, id string, props *NodeSqsGoSt
 				"QUEUE_URL":   queue.QueueUrl(),
 			},
 		})
-	nodeFn.AddToRolePolicy(iam.NewPolicyStatement(&iam.PolicyStatementProps{
-		Actions:   jsii.Strings("s3:PutObject"),
-		Resources: jsii.Strings("*"),
-	}))
-	nodeFn.AddToRolePolicy(iam.NewPolicyStatement(&iam.PolicyStatementProps{
-		Actions:   jsii.Strings("sqs:SendMessage"),
-		Resources: jsii.Strings("*"),
+	nodeFn.Role().AttachInlinePolicy(iam.NewPolicy(stack, jsii.String("fire-zip-policy"), &iam.PolicyProps{
+		Statements: &[]iam.PolicyStatement{
+			iam.NewPolicyStatement(&iam.PolicyStatementProps{
+				Actions:   jsii.Strings("s3:PutObject"),
+				Resources: jsii.Strings("*"),
+			}),
+			iam.NewPolicyStatement(&iam.PolicyStatementProps{
+				Actions:   jsii.Strings("sqs:SendMessage"),
+				Resources: jsii.Strings("*"),
+			}),
+		},
 	}))
 
-	// Go
-	goFn := lambdago.NewGoFunction(stack, jsii.String("goFn"), &lambdago.GoFunctionProps{
-		Entry: jsii.String("./src/go/lambdas/merge-zip.go"),
-		Role:  role,
-		Environment: &map[string]*string{
-			"BUCKET_NAME": bucket.BucketName(),
+	nodeFn2 := lambdanode.NewNodejsFunction(
+		stack,
+		jsii.String("nodeFn2"),
+		&lambdanode.NodejsFunctionProps{
+			Handler: jsii.String("handler"),
+			Entry:   jsii.String("./src/node/lambdas/merge-zip.ts"),
+			Role:    role,
+			Environment: &map[string]*string{
+				"BUCKET_NAME": bucket.BucketName(),
+				"QUEUE_URL":   queue.QueueUrl(),
+			},
+		})
+	nodeFn2.Role().AttachInlinePolicy(iam.NewPolicy(stack, jsii.String("handle-zip-policy"), &iam.PolicyProps{
+		Statements: &[]iam.PolicyStatement{
+			iam.NewPolicyStatement(&iam.PolicyStatementProps{
+				Actions:   jsii.Strings("s3:*"),
+				Resources: jsii.Strings("*"),
+			}),
 		},
-	})
-	goFn.Role().AddManagedPolicy(
+	}))
+	nodeFn2.Role().AddManagedPolicy(
 		iam.ManagedPolicy_FromAwsManagedPolicyName(
 			jsii.String("service-role/AWSLambdaSQSQueueExecutionRole"),
 		),
 	)
-	goFn.AddToRolePolicy(iam.NewPolicyStatement(&iam.PolicyStatementProps{
-		Actions:   jsii.Strings("s3:GetObject"),
-		Resources: jsii.Strings("*"),
-	}))
-	goFn.AddEventSource(
+	nodeFn2.AddEventSource(
 		lambdaeventsources.NewSqsEventSource(
 			queue, &lambdaeventsources.SqsEventSourceProps{
 				BatchSize: jsii.Number(1),
 			},
 		),
 	)
+	// Go
+	// goFn := lambdago.NewGoFunction(stack, jsii.String("goFn"), &lambdago.GoFunctionProps{
+	// 	Entry: jsii.String("./src/go/lambdas/merge-zip.go"),
+	// 	Role:  role,
+	// 	Environment: &map[string]*string{
+	// 		"BUCKET_NAME": bucket.BucketName(),
+	// 	},
+	// })
+	// goFn.Role().AddManagedPolicy(
+	// 	iam.ManagedPolicy_FromAwsManagedPolicyName(
+	// 		jsii.String("service-role/AWSLambdaSQSQueueExecutionRole"),
+	// 	),
+	// )
+	// goFn.AddToRolePolicy(iam.NewPolicyStatement(&iam.PolicyStatementProps{
+	// 	Actions:   jsii.Strings("s3:GetObject"),
+	// 	Resources: jsii.Strings("*"),
+	// }))
+	// goFn.AddEventSource(
+	// 	lambdaeventsources.NewSqsEventSource(
+	// 		queue, &lambdaeventsources.SqsEventSourceProps{
+	// 			BatchSize: jsii.Number(1),
+	// 		},
+	// 	),
+	// )
 
 	return stack
 }
