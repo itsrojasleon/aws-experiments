@@ -1,14 +1,17 @@
-import { SendMessageCommand } from '@aws-sdk/client-sqs';
+import { S3Client } from '@aws-sdk/client-s3';
+import { SendMessageCommand, SQSClient } from '@aws-sdk/client-sqs';
 import { Upload } from '@aws-sdk/lib-storage';
 import archive from 'archiver';
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import { PassThrough, Readable } from 'stream';
-import { s3, sqs } from '../clients';
 
 interface File {
   content: string;
   name: string;
 }
+
+const s3 = new S3Client({}),
+  sqs = new SQSClient({});
 
 const upload = (key: string, stream: Readable) => {
   const parallelUpload = new Upload({
