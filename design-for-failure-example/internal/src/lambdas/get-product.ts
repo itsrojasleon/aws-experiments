@@ -9,6 +9,8 @@ import {
 import { sqs } from '../clients';
 
 export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
+  console.log({ RecordsOnline: event.Records });
+
   const failedMessageIds: string[] = [];
 
   const promises = event.Records.map(async (record) => {
@@ -18,7 +20,7 @@ export const handler: SQSHandler = async (event): Promise<SQSBatchResponse> => {
       );
 
       const { data: product } = await axios.get<Product>(
-        `https://0tpnq8j330.execute-api.us-east-1.amazonaws.com/prod/api/${productId}`
+        `https://tvqgn89h2g.execute-api.us-east-1.amazonaws.com/prod/api/${productId}`
       );
 
       const msgBody: RedirectRequestEvent = {

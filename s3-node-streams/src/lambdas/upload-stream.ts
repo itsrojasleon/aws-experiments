@@ -1,7 +1,7 @@
 import { Upload } from '@aws-sdk/lib-storage';
 import { APIGatewayProxyHandler } from 'aws-lambda';
 import fs from 'fs';
-import { s3 } from '../clients/s3';
+import { s3 } from '../s3';
 
 export const handler: APIGatewayProxyHandler = async () => {
   try {
