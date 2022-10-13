@@ -1,0 +1,8 @@
+{
+	"devDependencies": {
+		"@types/aws-lambda": "^8.10.107",
+		"@types/node": "^18.8.5",
+		"axios": "^1.1.2",
+		"esbuild": "^0.15.10"
+	}
+}
