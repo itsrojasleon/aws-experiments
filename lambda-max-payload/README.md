@@ -1,12 +1,5 @@
-# Welcome to your CDK Go project!
+# Lambda max payload
 
-This is a blank project for CDK development with Go.
+Lambda will not handle a `massive` incoming post request since the maximum [invocation payload is 6 MB](https://docs.aws.amazon.com/lambda/latest/dg/gettingstarted-limits.html)
 
-The `cdk.json` file tells the CDK toolkit how to execute your app.
-
-## Useful commands
-
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
- * `go test`         run unit tests
+I need to look for other solution.
