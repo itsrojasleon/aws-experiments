@@ -6,4 +6,4 @@ Inside the lambda we can distinguish that the current message came from the main
 
 This is good is you only need to re-run the same process but giving more time to send sqs messages to the consumers (lambda in this case).
 
-![Tux, the Linux mascot](/images/logs.png)
+![Logs](https://github.com/rojasleon/aws-experiments/blob/main/queue-dlq-lambda/images/logs.png)
