@@ -1,12 +1,9 @@
-# Welcome to your CDK Go project!
+# Queue DLQ Lambda
 
-This is a blank project for CDK development with Go.
+A single lambda has a main queue and a dead letter queue as event source.
 
-The `cdk.json` file tells the CDK toolkit how to execute your app.
+Inside the lambda we can distinguish that the current message came from the main queue or the DLQ by looking at the `record.attributes.DeadLetterQueueSourceArn` property.
 
-## Useful commands
+This is good is you only need to re-run the same process but giving more time to send sqs messages to the consumers (lambda in this case).
 
- * `cdk deploy`      deploy this stack to your default AWS account/region
- * `cdk diff`        compare deployed stack with current state
- * `cdk synth`       emits the synthesized CloudFormation template
- * `go test`         run unit tests
+![Tux, the Linux mascot](/images/logs.png)
