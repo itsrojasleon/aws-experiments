@@ -5,7 +5,6 @@ import { s3 } from '../s3';
 
 export const handler: APIGatewayProxyHandler = async () => {
   try {
-    console.time('handleMultiPartUpload');
     const readable = fs.createReadStream('file.txt');
 
     const parallelUpload = new Upload({
@@ -16,13 +15,13 @@ export const handler: APIGatewayProxyHandler = async () => {
         Body: readable
       },
       queueSize: 4,
-      partSize: 1024 * 1024 * 5,
+      partSize: 1024 * 1024 * 5, // In bytes.
       leavePartsOnError: false
     });
 
-    parallelUpload.on('httpUploadProgress', (progress) => {
-      console.log({ progress });
-    });
+    // parallelUpload.on('httpUploadProgress', (progress) => {
+    // console.log({ progress });
+    // });
 
     await parallelUpload.done();
 

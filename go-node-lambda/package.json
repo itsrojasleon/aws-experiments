@@ -11,6 +11,7 @@
     "cdk": "cdk"
   },
   "devDependencies": {
+    "@aws-cdk/aws-lambda-go-alpha": "2.52.1-alpha.0",
     "@aws-sdk/client-s3": "^3.216.0",
     "@types/aws-lambda": "^8.10.109",
     "@types/jest": "^27.5.2",
