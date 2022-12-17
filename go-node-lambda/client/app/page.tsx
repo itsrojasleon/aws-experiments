@@ -1,20 +1,10 @@
 'use client';
 import React, { useEffect, useState } from 'react';
-
-const generatePresignedPostUrl = async () => {
-  const response = await fetch(
-    'https://gg3cob7q40.execute-api.us-east-1.amazonaws.com/upload', // TODO: Hide.
-    { method: 'POST' }
-  );
-
-  // TODO: Add types.
-  const { url, fields } = await response.json();
-
-  return { url, fields };
-};
+import { generatePresignedPostUrl } from '../utils';
 
 const Home = () => {
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -23,34 +13,32 @@ const Home = () => {
     if (selectedFile && selectedFile.type === 'application/json') {
       setFile(selectedFile);
     }
-
-    // If not, maybe show an error message.
   };
 
   useEffect(() => {
     if (file) {
-      const upload = async () => {
-        setLoading(true);
+      (async () => {
+        try {
+          setLoading(true);
 
-        const { url, fields } = await generatePresignedPostUrl();
+          const { url, fields } = await generatePresignedPostUrl();
 
-        const formData = new FormData();
+          const formData = new FormData();
 
-        Object.entries(fields).map(([key, value]) => {
-          formData.append(key, value as string);
-        });
+          Object.entries(fields).map(([key, value]) => {
+            formData.append(key, value as string);
+          });
 
-        formData.append('file', file);
+          formData.append('file', file);
 
-        await fetch(url, {
-          method: 'POST',
-          body: formData
-        });
+          await fetch(url, { method: 'POST', body: formData });
 
-        setLoading(false);
-      };
-
-      upload();
+          setLoading(false);
+        } catch (err: any) {
+          setError(err.message);
+          setLoading(false);
+        }
+      })();
     }
   }, [file]);
 
@@ -61,6 +49,7 @@ const Home = () => {
         <input type="file" className="hidden" onChange={handleChange} />
       </label>
       {loading && <h2 className="mt-2 text-gray-600">Uploading...</h2>}
+      {error && <h2 className="mt-2 text-red-600">{JSON.stringify(error)}</h2>}
     </div>
   );
 };

@@ -9,7 +9,6 @@ import { PassThrough, pipeline, Readable, Transform } from 'stream';
 import { parser } from 'stream-json';
 import { ulid } from 'ulid';
 import { promisify } from 'util';
-import { createGzip } from 'zlib';
 
 const pipelineAsync = promisify(pipeline);
 
@@ -30,7 +29,6 @@ export const handler: S3Handler = async (event) => {
       const bucketName = record.s3.bucket.name;
       const key = record.s3.object.key;
 
-      // TODO: Solve access denied error.
       const { Body } = await s3.send(
         new GetObjectCommand({
           Bucket: bucketName,
@@ -40,7 +38,7 @@ export const handler: S3Handler = async (event) => {
       const input = Body as Readable;
       const output = new PassThrough();
       const jsonParser = parser();
-      const gzip = createGzip();
+      // const gzip = createGzip();
 
       const validator = new Transform({
         objectMode: true,
@@ -61,7 +59,11 @@ export const handler: S3Handler = async (event) => {
         }
       });
 
-      await pipelineAsync(input, jsonParser, validator, gzip, output);
+      try {
+        await pipelineAsync(input, jsonParser, validator, output);
+      } catch (err) {
+        console.error({ err });
+      }
 
       await s3.send(
         new PutObjectCommand({
@@ -72,8 +74,10 @@ export const handler: S3Handler = async (event) => {
       );
     });
 
-    await Promise.all(promises);
+    await Promise.all(promises).then(() => {
+      console.log('All promises resolved');
+    });
   } catch (err) {
-    console.error(err);
+    console.error({ err });
   }
 };

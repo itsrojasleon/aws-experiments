@@ -80,7 +80,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
       environment,
       bundling
     });
-    this.bucket.grantRead(processLambda);
+    this.bucket.grantReadWrite(processLambda);
 
     // Every time a file is uploaded to the bucket, processLambda function is invoked.
     this.bucket.addEventNotification(
