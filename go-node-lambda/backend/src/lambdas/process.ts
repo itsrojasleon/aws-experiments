@@ -1,14 +1,18 @@
-import {
-  GetObjectCommand,
-  PutObjectCommand,
-  S3Client
-} from '@aws-sdk/client-s3';
+import { GetObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { S3Handler } from 'aws-lambda';
+import { parse } from 'csv-parse';
 import { Validator } from 'jsonschema';
-import { PassThrough, pipeline, Readable, Transform } from 'stream';
-import { parser } from 'stream-json';
+import {
+  PassThrough,
+  pipeline,
+  Readable,
+  Transform,
+  TransformCallback
+} from 'stream';
 import { ulid } from 'ulid';
 import { promisify } from 'util';
+import { createGzip } from 'zlib';
 
 const pipelineAsync = promisify(pipeline);
 
@@ -24,8 +28,8 @@ const schema = {
 };
 
 export const handler: S3Handler = async (event) => {
-  try {
-    const promises = event.Records.map(async (record) => {
+  const promises = event.Records.map(async (record) => {
+    try {
       const bucketName = record.s3.bucket.name;
       const key = record.s3.object.key;
 
@@ -37,47 +41,62 @@ export const handler: S3Handler = async (event) => {
       );
       const input = Body as Readable;
       const output = new PassThrough();
-      const jsonParser = parser();
-      // const gzip = createGzip();
+      const csvParser = parse({ columns: true });
+      const gzip = createGzip();
 
-      const validator = new Transform({
-        objectMode: true,
-        transform(chunk, _, cb) {
+      class Val extends Transform {
+        numChunks = 0;
+
+        constructor() {
+          super({ objectMode: true });
+        }
+
+        _transform(chunk: any, _: BufferEncoding, callback: TransformCallback) {
+          this.numChunks++;
+
           const { valid, errors } = schemaValidator.validate(chunk, schema);
 
-          const transformedChunk = {
-            ...chunk,
-            valid,
-            ...(errors.length && {
-              errors
-            })
-          };
+          const transformedChunk = JSON.stringify(
+            {
+              ...chunk,
+              valid,
+              ...(errors.length && {
+                errors
+              })
+            },
+            null,
+            2
+          );
 
-          this.push(JSON.stringify(transformedChunk));
+          const auxChar = this.numChunks === 1 ? '[' : ',';
 
-          cb();
+          callback(null, auxChar + transformedChunk);
         }
-      });
 
-      try {
-        await pipelineAsync(input, jsonParser, validator, output);
-      } catch (err) {
-        console.error({ err });
+        _flush(callback: TransformCallback): void {
+          callback(null, ']');
+        }
       }
 
-      await s3.send(
-        new PutObjectCommand({
+      await pipelineAsync(input, csvParser, new Val(), gzip, output);
+
+      const upload = new Upload({
+        client: s3,
+        params: {
           Bucket: bucketName,
           Key: `${ulid()}.json.gz`,
           Body: output
-        })
-      );
-    });
+        },
+        queueSize: 4,
+        partSize: 1024 * 1024 * 5, // 5 MB.
+        leavePartsOnError: false
+      });
 
-    await Promise.all(promises).then(() => {
-      console.log('All promises resolved');
-    });
-  } catch (err) {
-    console.error({ err });
-  }
+      await upload.done();
+    } catch (err) {
+      console.error({ err });
+    }
+  });
+
+  await Promise.allSettled(promises);
 };

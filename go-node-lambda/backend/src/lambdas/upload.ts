@@ -5,7 +5,7 @@ import { s3 } from '../s3';
 
 export const handler: APIGatewayProxyHandler = async () => {
   try {
-    const key = `${ulid()}.json`;
+    const key = `${ulid()}.csv`;
 
     const { url, fields } = await createPresignedPost(s3, {
       Bucket: process.env.BUCKET_NAME!,
