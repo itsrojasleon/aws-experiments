@@ -10,7 +10,7 @@ const Home = () => {
   const handleChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = event.target.files![0];
 
-    if (selectedFile && selectedFile.type === 'application/json') {
+    if (selectedFile && selectedFile.type === 'text/csv') {
       setFile(selectedFile);
     }
   };
@@ -23,6 +23,8 @@ const Home = () => {
 
           const { url, fields } = await generatePresignedPostUrl();
 
+          console.log({ url, fields });
+
           const formData = new FormData();
 
           Object.entries(fields).map(([key, value]) => {
@@ -34,6 +36,7 @@ const Home = () => {
           await fetch(url, { method: 'POST', body: formData });
 
           setLoading(false);
+          setFile(null);
         } catch (err: any) {
           setError(err.message);
           setLoading(false);
@@ -45,7 +48,7 @@ const Home = () => {
   return (
     <div>
       <label className="relative overflow-hidden cursor-pointer bg-blue-500 hover:bg-blue-600 focus:outline-none focus:shadow-outline-blue active:bg-blue-800 text-white font-bold py-2 px-4 rounded-full">
-        <span className="text-lg font-bold uppercase">Select a file</span>
+        <span className="text-lg font-bold uppercase">Select a JSON file</span>
         <input type="file" className="hidden" onChange={handleChange} />
       </label>
       {loading && <h2 className="mt-2 text-gray-600">Uploading...</h2>}

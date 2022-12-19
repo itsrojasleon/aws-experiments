@@ -7,20 +7,24 @@ import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-al
 import * as cdk from 'aws-cdk-lib';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
+import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as lambdaNode from 'aws-cdk-lib/aws-lambda-nodejs';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as s3n from 'aws-cdk-lib/aws-s3-notifications';
+import * as sqs from 'aws-cdk-lib/aws-sqs';
 import { Construct } from 'constructs';
 
 export class GoNodeLambdaStack extends cdk.Stack {
   private bucket: s3.Bucket;
   private api: HttpApi;
+  private queue: sqs.Queue;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
 
     this.buildApiGW();
     this.buildBucket();
+    this.buildQueues();
     this.buildLambdas();
   }
 
@@ -28,7 +32,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
     this.bucket = new s3.Bucket(this, 'bucket', {
       cors: [
         {
-          allowedMethods: [s3.HttpMethods.POST], // What about adding PUT?
+          allowedMethods: [s3.HttpMethods.POST],
           allowedOrigins: ['*'],
           allowedHeaders: ['*']
         }
@@ -47,6 +51,10 @@ export class GoNodeLambdaStack extends cdk.Stack {
     );
   }
 
+  buildQueues() {
+    this.queue = new sqs.Queue(this, 'queue');
+  }
+
   buildLambdas() {
     const environment = {
       BUCKET_NAME: this.bucket.bucketName
@@ -60,7 +68,6 @@ export class GoNodeLambdaStack extends cdk.Stack {
       entry: 'src/lambdas/upload.ts',
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_18_X,
-      memorySize: 512, // MB.
       environment,
       bundling
     });
@@ -71,21 +78,40 @@ export class GoNodeLambdaStack extends cdk.Stack {
       integration: new HttpLambdaIntegration('upload', uploadLambda)
     });
 
-    const processLambda = new lambdaNode.NodejsFunction(this, 'processLambda', {
-      entry: 'src/lambdas/process.ts',
-      handler: 'handler',
-      runtime: lambda.Runtime.NODEJS_18_X,
-      timeout: cdk.Duration.minutes(15), // Max timeout for lambda.
-      memorySize: 2048, // MB.
-      environment,
-      bundling
-    });
-    this.bucket.grantReadWrite(processLambda);
+    const validateLambda = new lambdaNode.NodejsFunction(
+      this,
+      'validateLambda',
+      {
+        entry: 'src/lambdas/process.ts',
+        handler: 'handler',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        memorySize: 1024, // Adjust this value to your needs.
+        environment,
+        bundling
+      }
+    );
+    this.bucket.grantReadWrite(validateLambda);
 
-    // Every time a file is uploaded to the bucket, processLambda function is invoked.
+    // Every time a file is uploaded to the bucket, validateLambda function is invoked.
     this.bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(processLambda)
+      new s3n.LambdaDestination(validateLambda)
+    );
+
+    const downloadLambda = new lambdaNode.NodejsFunction(
+      this,
+      'downloadLambda',
+      {
+        entry: 'src/lambdas/download.ts',
+        handler: 'handler',
+        runtime: lambda.Runtime.NODEJS_18_X,
+        environment,
+        bundling
+      }
+    );
+
+    downloadLambda.addEventSource(
+      new lambdaEventSources.SqsEventSource(this.queue)
     );
   }
 
