@@ -1,33 +1,85 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
+import { GetCommand, UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { SQSHandler } from 'aws-lambda';
-import { s3 } from '../clients';
+import { APIGatewayProxyHandler } from 'aws-lambda';
+import { dynamo, s3 } from '../clients';
+import { Status } from '../types';
 
-export const handler: SQSHandler = async (event) => {
-  const failedMessageIds: string[] = [];
+export const handler: APIGatewayProxyHandler = async (event) => {
+  try {
+    const pathParams = event.pathParameters || {};
 
-  const promises = event.Records.map(async (record) => {
-    try {
-      const { bucketName, bucketKey } = JSON.parse(record.body);
-
-      const url = await getSignedUrl(
-        s3,
-        new GetObjectCommand({
-          Bucket: bucketName,
-          Key: bucketKey
-        }),
-        { expiresIn: 3600 * 6 } // 6 hours.
-      );
-
-      // TODO: Where do we send the URL?
-    } catch (err) {
-      console.error({ err });
+    if (!pathParams.id) {
+      return {
+        statusCode: 400,
+        body: 'Missing id path parameter'
+      };
     }
-  });
 
-  await Promise.allSettled(promises);
+    const { Item } = await dynamo.send(
+      new GetCommand({
+        TableName: process.env.TABLE_NAME!,
+        Key: {
+          id: pathParams.id
+        }
+      })
+    );
 
-  return {
-    batchItemFailures: failedMessageIds.map((id) => ({ itemIdentifier: id }))
-  };
+    if (!Item) {
+      return {
+        statusCode: 404,
+        body: 'Item not found'
+      };
+    }
+
+    if (Item.status === Status.Processing) {
+      return {
+        statusCode: 400,
+        body: 'Still processing file...'
+      };
+    }
+
+    const url = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: process.env.BUCKET_NAME,
+        Key: `validations/${pathParams.id}.json.gz`
+      }),
+      { expiresIn: 3600 } // 1 hour.
+    );
+
+    // TODO: Add some logic to retrieve the downloadable url from dynamo
+    // instead of generating it in every request.
+    // Add a new field to store the expiration date of the url and start
+    // generating a new one when the current one expires.
+
+    await dynamo.send(
+      new UpdateCommand({
+        TableName: process.env.TABLE_NAME!,
+        Key: { id: pathParams.id },
+        UpdateExpression: 'SET #get = :get',
+        ExpressionAttributeNames: {
+          '#get': 'get'
+        },
+        ExpressionAttributeValues: {
+          ':get': {
+            url
+          }
+        }
+      })
+    );
+
+    return {
+      statusCode: 201,
+      body: JSON.stringify({
+        url
+      })
+    };
+  } catch (err) {
+    console.error(err);
+    return {
+      statusCode: 500,
+      body: 'Something went wrong'
+    };
+  }
 };

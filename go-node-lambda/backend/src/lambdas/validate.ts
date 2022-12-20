@@ -1,9 +1,10 @@
 import { GetObjectCommand } from '@aws-sdk/client-s3';
-import { SendMessageCommand } from '@aws-sdk/client-sqs';
+import { UpdateCommand } from '@aws-sdk/lib-dynamodb';
 import { Upload } from '@aws-sdk/lib-storage';
-import { S3Handler } from 'aws-lambda';
+import { S3Event, SQSHandler } from 'aws-lambda';
 import { parse } from 'csv-parse';
 import { Validator as JsonSchemaValidator } from 'jsonschema';
+
 import {
   PassThrough,
   pipeline,
@@ -11,10 +12,10 @@ import {
   Transform,
   TransformCallback
 } from 'stream';
-import { ulid } from 'ulid';
 import { promisify } from 'util';
 import { createGzip } from 'zlib';
-import { s3, sqs } from '../clients';
+import { dynamo, s3 } from '../clients';
+import { Status } from '../types';
 
 const pipelineAsync = promisify(pipeline);
 
@@ -27,9 +28,14 @@ const schema = {
   required: ['Suppressed']
 };
 
-export const handler: S3Handler = async (event) => {
-  const promises = event.Records.map(async (record) => {
+export const handler: SQSHandler = async (event) => {
+  const failedMessageIds: string[] = [];
+
+  const promises = event.Records.map(async ({ body, messageId }) => {
     try {
+      const { Records }: S3Event = JSON.parse(body);
+      const record = Records[0];
+
       const bucketName = record.s3.bucket.name;
 
       const { Body } = await s3.send(
@@ -43,10 +49,6 @@ export const handler: S3Handler = async (event) => {
       const csvParser = parse({ columns: true });
       const gzip = createGzip();
 
-      // We'll get a BAD gzip file if we do this.
-      // Do not do this!
-      // output.write('[');
-
       class Validator extends Transform {
         private numChunks = 0;
 
@@ -59,6 +61,7 @@ export const handler: S3Handler = async (event) => {
 
           const { valid, errors } = schemaValidator.validate(chunk, schema);
 
+          // Modify each chunk so we can know where there was an error or not.
           const transformedChunk = JSON.stringify(
             {
               ...chunk,
@@ -83,7 +86,11 @@ export const handler: S3Handler = async (event) => {
 
       await pipelineAsync(input, csvParser, new Validator(), gzip, output);
 
-      const key = `${ulid()}.json.gz`;
+      const id = record.s3.object.key
+        .replace('uploads/', '')
+        .replace('.csv', '');
+
+      const key = `validations/${id}.json.gz`;
 
       const upload = new Upload({
         client: s3,
@@ -99,14 +106,22 @@ export const handler: S3Handler = async (event) => {
 
       await upload.done();
 
-      await sqs.send(
-        new SendMessageCommand({
-          QueueUrl: process.env.QUEUE_URL!,
-          MessageBody: JSON.stringify({ bucketKey: key, bucketName })
+      await dynamo.send(
+        new UpdateCommand({
+          TableName: process.env.TABLE_NAME!,
+          Key: { id },
+          UpdateExpression: 'SET #status = :status',
+          ExpressionAttributeNames: {
+            '#status': 'status'
+          },
+          ExpressionAttributeValues: {
+            ':status': Status.Completed
+          }
         })
       );
     } catch (err) {
       console.error({ err });
+      failedMessageIds.push(messageId);
     }
   });
 

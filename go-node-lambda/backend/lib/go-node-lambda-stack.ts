@@ -5,6 +5,7 @@ import {
 } from '@aws-cdk/aws-apigatewayv2-alpha';
 import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
 import * as cdk from 'aws-cdk-lib';
+import * as dynamo from 'aws-cdk-lib/aws-dynamodb';
 import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
@@ -16,8 +17,9 @@ import { Construct } from 'constructs';
 
 export class GoNodeLambdaStack extends cdk.Stack {
   private bucket: s3.Bucket;
+  private table: dynamo.Table;
   private api: HttpApi;
-  private queue: sqs.Queue;
+  private validationQueue: sqs.Queue;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -25,6 +27,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
     this.buildApiGW();
     this.buildBucket();
     this.buildQueues();
+    this.buildDynamoTable();
     this.buildLambdas();
   }
 
@@ -51,14 +54,26 @@ export class GoNodeLambdaStack extends cdk.Stack {
     );
   }
 
+  buildDynamoTable() {
+    this.table = new dynamo.Table(this, 'table', {
+      partitionKey: {
+        name: 'id',
+        type: dynamo.AttributeType.STRING
+      },
+      billingMode: dynamo.BillingMode.PAY_PER_REQUEST
+    });
+  }
+
   buildQueues() {
-    this.queue = new sqs.Queue(this, 'queue');
+    this.validationQueue = new sqs.Queue(this, 'validationQueue');
+
+    this.bucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.SqsDestination(this.validationQueue)
+    );
   }
 
   buildLambdas() {
-    const environment = {
-      BUCKET_NAME: this.bucket.bucketName
-    };
     const bundling: lambdaNode.BundlingOptions = {
       minify: true,
       externalModules: ['aws-sdk', '@aws-sdk']
@@ -68,7 +83,10 @@ export class GoNodeLambdaStack extends cdk.Stack {
       entry: 'src/lambdas/upload.ts',
       handler: 'handler',
       runtime: lambda.Runtime.NODEJS_18_X,
-      environment,
+      environment: {
+        BUCKET_NAME: this.bucket.bucketName,
+        TABLE_NAME: this.table.tableName
+      },
       bundling
     });
 
@@ -77,25 +95,31 @@ export class GoNodeLambdaStack extends cdk.Stack {
       methods: [HttpMethod.POST],
       integration: new HttpLambdaIntegration('upload', uploadLambda)
     });
+    this.table.grantWriteData(uploadLambda);
 
     const validateLambda = new lambdaNode.NodejsFunction(
       this,
       'validateLambda',
       {
-        entry: 'src/lambdas/process.ts',
+        entry: 'src/lambdas/validate.ts',
         handler: 'handler',
         runtime: lambda.Runtime.NODEJS_18_X,
-        memorySize: 1024, // Adjust this value to your needs.
-        environment,
+        memorySize: 1024,
+        environment: {
+          BUCKET_NAME: this.bucket.bucketName
+        },
         bundling
       }
     );
+
+    this.validationQueue.grantConsumeMessages(validateLambda);
+
     this.bucket.grantReadWrite(validateLambda);
 
-    // Every time a file is uploaded to the bucket, validateLambda function is invoked.
-    this.bucket.addEventNotification(
-      s3.EventType.OBJECT_CREATED,
-      new s3n.LambdaDestination(validateLambda)
+    validateLambda.addEventSource(
+      new lambdaEventSources.SqsEventSource(this.validationQueue, {
+        reportBatchItemFailures: true
+      })
     );
 
     const downloadLambda = new lambdaNode.NodejsFunction(
@@ -105,14 +129,20 @@ export class GoNodeLambdaStack extends cdk.Stack {
         entry: 'src/lambdas/download.ts',
         handler: 'handler',
         runtime: lambda.Runtime.NODEJS_18_X,
-        environment,
+        environment: {
+          TABLE_NAME: this.table.tableName
+        },
         bundling
       }
     );
 
-    downloadLambda.addEventSource(
-      new lambdaEventSources.SqsEventSource(this.queue)
-    );
+    this.table.grantReadData(downloadLambda);
+
+    this.api.addRoutes({
+      path: '/download/{id}',
+      methods: [HttpMethod.GET],
+      integration: new HttpLambdaIntegration('donwload', downloadLambda)
+    });
   }
 
   buildApiGW() {
