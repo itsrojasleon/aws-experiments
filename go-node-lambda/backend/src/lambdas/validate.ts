@@ -4,7 +4,6 @@ import { Upload } from '@aws-sdk/lib-storage';
 import { S3Event, SQSHandler } from 'aws-lambda';
 import { parse } from 'csv-parse';
 import { Validator as JsonSchemaValidator } from 'jsonschema';
-
 import {
   PassThrough,
   pipeline,
@@ -13,7 +12,7 @@ import {
   TransformCallback
 } from 'stream';
 import { promisify } from 'util';
-import { createGzip } from 'zlib';
+import * as zlib from 'zlib';
 import { dynamo, s3 } from '../clients';
 import { Status } from '../types';
 
@@ -44,10 +43,16 @@ export const handler: SQSHandler = async (event) => {
           Key: record.s3.object.key
         })
       );
+
       const input = Body as Readable;
       const output = new PassThrough();
       const csvParser = parse({ columns: true });
-      const gzip = createGzip();
+
+      const gzip = zlib.createGzip({
+        // Emit a 'data' event after each write, rather than buffering
+        // the data until the stream is closed.
+        flush: zlib.constants.Z_SYNC_FLUSH
+      });
 
       class Validator extends Transform {
         private numChunks = 0;
@@ -56,7 +61,7 @@ export const handler: SQSHandler = async (event) => {
           super({ objectMode: true });
         }
 
-        _transform(chunk: any, _: BufferEncoding, callback: TransformCallback) {
+        _transform(chunk: any, _: BufferEncoding, cb: TransformCallback) {
           this.numChunks++;
 
           const { valid, errors } = schemaValidator.validate(chunk, schema);
@@ -67,44 +72,47 @@ export const handler: SQSHandler = async (event) => {
               ...chunk,
               valid,
               ...(errors.length && {
-                errors
+                errors: errors.map((e) => e.stack)
               })
             },
             null,
             2
           );
-
           const auxChar = this.numChunks === 1 ? '[' : ',';
 
-          callback(null, auxChar + transformedChunk);
+          cb(null, auxChar + transformedChunk);
         }
 
-        _flush(callback: TransformCallback): void {
-          callback(null, ']');
+        _flush(cb: TransformCallback) {
+          cb(null, ']');
         }
       }
 
-      await pipelineAsync(input, csvParser, new Validator(), gzip, output);
+      const validator = new Validator();
 
       const id = record.s3.object.key
         .replace('uploads/', '')
         .replace('.csv', '');
 
-      const key = `validations/${id}.json.gz`;
-
       const upload = new Upload({
         client: s3,
         params: {
           Bucket: bucketName,
-          Key: key,
+          Key: `validations/${id}.json.gz`,
           Body: output
-        },
-        queueSize: 4,
-        partSize: 1024 * 1024 * 5, // 5 MB.
-        leavePartsOnError: false
+        }
       });
 
-      await upload.done();
+      const pipelinePromise = pipelineAsync(
+        input,
+        csvParser,
+        validator,
+        gzip,
+        output
+      );
+      const uploadPromise = upload.done();
+
+      await Promise.all([pipelinePromise, uploadPromise]);
 
       await dynamo.send(
         new UpdateCommand({
@@ -126,4 +134,7 @@ export const handler: SQSHandler = async (event) => {
   });
 
   await Promise.allSettled(promises);
+  return {
+    batchItemFailures: failedMessageIds.map((id) => ({ itemIdentifier: id }))
+  };
 };

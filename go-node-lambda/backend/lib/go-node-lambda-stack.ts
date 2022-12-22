@@ -20,6 +20,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
   private table: dynamo.Table;
   private api: HttpApi;
   private validationQueue: sqs.Queue;
+  private processingQueue: sqs.Queue;
 
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
     super(scope, id, props);
@@ -42,12 +43,12 @@ export class GoNodeLambdaStack extends cdk.Stack {
       ]
     });
 
-    // TODO: Is there another approach where I can give upload access to
+    // TODO: Is there another approach where I can give access to
     // the bucket in a more secure way?.
     this.bucket.addToResourcePolicy(
       new iam.PolicyStatement({
         effect: iam.Effect.ALLOW,
-        actions: ['s3:PutObject'],
+        actions: ['s3:PutObject', 's3:GetObject'],
         principals: [new iam.AnyPrincipal()],
         resources: [`${this.bucket.bucketArn}/*`]
       })
@@ -66,10 +67,18 @@ export class GoNodeLambdaStack extends cdk.Stack {
 
   buildQueues() {
     this.validationQueue = new sqs.Queue(this, 'validationQueue');
+    this.processingQueue = new sqs.Queue(this, 'processingQueue');
 
     this.bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
-      new s3n.SqsDestination(this.validationQueue)
+      new s3n.SqsDestination(this.validationQueue),
+      { prefix: 'uploads/' }
+    );
+
+    this.bucket.addEventNotification(
+      s3.EventType.OBJECT_CREATED,
+      new s3n.SqsDestination(this.processingQueue),
+      { prefix: 'validations/' }
     );
   }
 
@@ -89,13 +98,12 @@ export class GoNodeLambdaStack extends cdk.Stack {
       },
       bundling
     });
-
+    this.table.grantWriteData(uploadLambda);
     this.api.addRoutes({
       path: '/upload',
       methods: [HttpMethod.POST],
       integration: new HttpLambdaIntegration('upload', uploadLambda)
     });
-    this.table.grantWriteData(uploadLambda);
 
     const validateLambda = new lambdaNode.NodejsFunction(
       this,
@@ -105,19 +113,34 @@ export class GoNodeLambdaStack extends cdk.Stack {
         handler: 'handler',
         runtime: lambda.Runtime.NODEJS_18_X,
         memorySize: 1024,
+        timeout: cdk.Duration.minutes(1),
         environment: {
-          BUCKET_NAME: this.bucket.bucketName
+          BUCKET_NAME: this.bucket.bucketName,
+          TABLE_NAME: this.table.tableName
         },
         bundling
       }
     );
-
     this.validationQueue.grantConsumeMessages(validateLambda);
-
+    this.table.grantWriteData(validateLambda);
     this.bucket.grantReadWrite(validateLambda);
-
     validateLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(this.validationQueue, {
+        reportBatchItemFailures: true
+      })
+    );
+
+    const processLambda = new lambdaNode.NodejsFunction(this, 'processLambda', {
+      entry: 'src/lambdas/process.ts',
+      handler: 'handler',
+      runtime: lambda.Runtime.NODEJS_18_X,
+      memorySize: 2048,
+      timeout: cdk.Duration.minutes(1),
+      bundling
+    });
+    this.bucket.grantReadWrite(validateLambda);
+    processLambda.addEventSource(
+      new lambdaEventSources.SqsEventSource(this.processingQueue, {
         reportBatchItemFailures: true
       })
     );
@@ -130,14 +153,13 @@ export class GoNodeLambdaStack extends cdk.Stack {
         handler: 'handler',
         runtime: lambda.Runtime.NODEJS_18_X,
         environment: {
-          TABLE_NAME: this.table.tableName
+          TABLE_NAME: this.table.tableName,
+          BUCKET_NAME: this.bucket.bucketName
         },
         bundling
       }
     );
-
-    this.table.grantReadData(downloadLambda);
-
+    this.table.grantReadWriteData(downloadLambda);
     this.api.addRoutes({
       path: '/download/{id}',
       methods: [HttpMethod.GET],

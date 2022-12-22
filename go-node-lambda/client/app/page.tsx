@@ -87,9 +87,9 @@ const Home = () => {
   }, [state.file]);
 
   return (
-    <div className="flex flex-col gap-3">
-      {!state.file && !state.loading ? (
-        <label className="relative overflow-hidden cursor-pointer bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue active:bg-blue-800 text-white font-bold py-3 px-5 rounded-full">
+    <div className="ml-5 mt-5">
+      {!state.file && (
+        <label className="relative overflow-hidden cursor-pointer bg-blue-600 hover:bg-blue-700 focus:outline-none focus:shadow-outline-blue active:bg-blue-800 font-bold py-3 px-5 rounded-full text-white">
           <span className="font-bold uppercase">Select a CSV file</span>
           <input
             className="hidden"
@@ -106,7 +106,9 @@ const Home = () => {
             }}
           />
         </label>
-      ) : (
+      )}
+
+      {state.file && !state.loading && (
         <div>
           <button
             onClick={async () => {
@@ -118,18 +120,15 @@ const Home = () => {
 
               dispatch({ type: ActionType.SET_DOWNLOADABLE_URL, payload: url });
             }}
-            className="bg-orange-500 hover:bg-orange-700 font-bold py-1 px-2 rounded-full"
+            className="bg-red-500 hover:bg-red-700 font-bold py-1 px-2 rounded-full text-white"
           >
             Get url to download file
           </button>
-          <p>{state.id || 'OK'}</p>
-          {state.downloadableUrl && (
-            <p className="text-2xl">{state.downloadableUrl}</p>
-          )}
+          {state.downloadableUrl && <input value={state.downloadableUrl} />}
         </div>
       )}
 
-      <div className="my-2">
+      <div className="mt-10">
         {state.loading && <h2>Loading...</h2>}
         {state.error && <h2>Error: {state.error}</h2>}
       </div>

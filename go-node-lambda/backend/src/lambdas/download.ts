@@ -19,23 +19,25 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const { Item } = await dynamo.send(
       new GetCommand({
         TableName: process.env.TABLE_NAME!,
-        Key: {
-          id: pathParams.id
-        }
+        Key: { id: pathParams.id }
       })
     );
 
     if (!Item) {
       return {
         statusCode: 404,
-        body: 'Item not found'
+        body: JSON.stringify({
+          message: 'Item not found'
+        })
       };
     }
 
     if (Item.status === Status.Processing) {
       return {
         statusCode: 400,
-        body: 'Still processing file...'
+        body: JSON.stringify({
+          message: 'Item is still processing...'
+        })
       };
     }
 
@@ -62,9 +64,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
           '#get': 'get'
         },
         ExpressionAttributeValues: {
-          ':get': {
-            url
-          }
+          ':get': { url }
         }
       })
     );
@@ -72,14 +72,17 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     return {
       statusCode: 201,
       body: JSON.stringify({
-        url
+        url,
+        id: pathParams.id
       })
     };
   } catch (err) {
-    console.error(err);
+    console.error({ err });
     return {
       statusCode: 500,
-      body: 'Something went wrong'
+      body: JSON.stringify({
+        message: 'Something went wrong'
+      })
     };
   }
 };
