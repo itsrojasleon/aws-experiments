@@ -6,7 +6,6 @@ import {
 import { HttpLambdaIntegration } from '@aws-cdk/aws-apigatewayv2-integrations-alpha';
 import * as cdk from 'aws-cdk-lib';
 import * as dynamo from 'aws-cdk-lib/aws-dynamodb';
-import * as iam from 'aws-cdk-lib/aws-iam';
 import * as lambda from 'aws-cdk-lib/aws-lambda';
 import * as lambdaEventSources from 'aws-cdk-lib/aws-lambda-event-sources';
 import * as lambdaNode from 'aws-cdk-lib/aws-lambda-nodejs';
@@ -42,17 +41,6 @@ export class GoNodeLambdaStack extends cdk.Stack {
         }
       ]
     });
-
-    // TODO: Is there another approach where I can give access to
-    // the bucket in a more secure way?.
-    this.bucket.addToResourcePolicy(
-      new iam.PolicyStatement({
-        effect: iam.Effect.ALLOW,
-        actions: ['s3:PutObject', 's3:GetObject'],
-        principals: [new iam.AnyPrincipal()],
-        resources: [`${this.bucket.bucketArn}/*`]
-      })
-    );
   }
 
   buildDynamoTable() {
@@ -66,8 +54,12 @@ export class GoNodeLambdaStack extends cdk.Stack {
   }
 
   buildQueues() {
-    this.validationQueue = new sqs.Queue(this, 'validationQueue');
-    this.processingQueue = new sqs.Queue(this, 'processingQueue');
+    this.validationQueue = new sqs.Queue(this, 'validationQueue', {
+      visibilityTimeout: cdk.Duration.minutes(2)
+    });
+    this.processingQueue = new sqs.Queue(this, 'processingQueue', {
+      visibilityTimeout: cdk.Duration.minutes(2)
+    });
 
     this.bucket.addEventNotification(
       s3.EventType.OBJECT_CREATED,
@@ -104,6 +96,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
       methods: [HttpMethod.POST],
       integration: new HttpLambdaIntegration('upload', uploadLambda)
     });
+    this.bucket.grantPut(uploadLambda);
 
     const validateLambda = new lambdaNode.NodejsFunction(
       this,
@@ -138,7 +131,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
       timeout: cdk.Duration.minutes(1),
       bundling
     });
-    this.bucket.grantReadWrite(validateLambda);
+    this.bucket.grantReadWrite(processLambda);
     processLambda.addEventSource(
       new lambdaEventSources.SqsEventSource(this.processingQueue, {
         reportBatchItemFailures: true
@@ -160,6 +153,7 @@ export class GoNodeLambdaStack extends cdk.Stack {
       }
     );
     this.table.grantReadWriteData(downloadLambda);
+    this.bucket.grantRead(downloadLambda);
     this.api.addRoutes({
       path: '/download/{id}',
       methods: [HttpMethod.GET],
