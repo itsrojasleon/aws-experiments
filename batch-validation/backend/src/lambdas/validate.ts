@@ -37,12 +37,15 @@ export const handler: SQSHandler = async (event) => {
 
       const bucketName = record.s3.bucket.name;
 
-      const { Body } = await s3.send(
+      const { Body, Metadata } = await s3.send(
         new GetObjectCommand({
           Bucket: bucketName,
           Key: record.s3.object.key
         })
       );
+
+      // Here's the metadata!
+      console.log({ Metadata });
 
       const input = Body as Readable;
       const output = new PassThrough();
