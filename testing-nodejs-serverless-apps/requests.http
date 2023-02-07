@@ -1,0 +1,7 @@
+POST https://w169gqpeea.execute-api.us-east-1.amazonaws.com/testing/blog HTTP/1.1
+Content-Type: application/json
+
+{
+  "name": "The dude",
+  "content": "I'm the dude, so that's what you call me, that or, uh, His Dudeness, or uh, Duder, or El Duderino if you're not into the whole brevity thing"
+}

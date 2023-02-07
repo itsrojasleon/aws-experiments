@@ -1,0 +1,38 @@
+{
+  "name": "testing-nodejs-serverless-apps",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "dev": "NODE_ENV=development serverless offline start --noTimeout --verbose --reloadHandler --stage=development",
+    "test": "NODE_ENV=development TABLE_NAME=x QUEUE_URL=x jest --watchAll --verbose",
+    "test:ci": "NODE_ENV=development TABLE_NAME=x QUEUE_URL=x jest",
+    "deploy": "serverless deploy",
+    "remove": "serverless remove"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@aws-sdk/client-dynamodb": "^3.264.0",
+    "@aws-sdk/client-s3": "^3.264.0",
+    "@aws-sdk/client-sqs": "^3.264.0",
+    "@aws-sdk/lib-dynamodb": "^3.264.0",
+    "@types/aws-lambda": "^8.10.110",
+    "@types/jest": "^29.4.0",
+    "@types/node": "^18.11.19",
+    "@types/serverless": "^3.12.9",
+    "aws-sdk-client-mock": "^2.0.1",
+    "esbuild": "^0.14.27",
+    "jest": "^29.4.1",
+    "serverless": "^3.7.5",
+    "serverless-dynamodb-local": "^0.2.40",
+    "serverless-esbuild": "^1.37.2",
+    "serverless-offline": "^12.0.4",
+    "serverless-offline-sqs": "^7.3.2",
+    "ts-jest": "^29.0.5",
+    "ts-node": "^10.9.1",
+    "tsx": "^3.12.3",
+    "typescript": "^4.9.5"
+  }
+}
