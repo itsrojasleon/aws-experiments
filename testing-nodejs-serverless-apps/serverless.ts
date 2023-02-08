@@ -4,6 +4,7 @@ import { Stages } from './src/types';
 const stage = "${opt:stage, 'testing'}";
 const tableName = 'BlogTable';
 const queueName = 'Queue';
+const isDev = process.env.NODE_ENV === Stages.Dev;
 
 const serverlessConfig: Serverless = {
   service: `blogger-${stage}`,
@@ -17,6 +18,9 @@ const serverlessConfig: Serverless = {
     },
     iam: {
       role: {
+        managedPolicies: [
+          'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
+        ],
         statements: [
           {
             Effect: 'Allow',
@@ -36,8 +40,10 @@ const serverlessConfig: Serverless = {
     create: {
       handler: './src/lambdas/create.handler',
       environment: {
-        TABLE_NAME:
-          process.env.NODE_ENV === Stages.Dev ? tableName : { Ref: 'Table' }
+        TABLE_NAME: isDev ? tableName : { Ref: 'Table' },
+        QUEUE_URL: isDev
+          ? `http://localhost:9324/000000000000/${queueName}`
+          : { 'Fn::GetAtt': [queueName, 'QueueUrl'] }
       },
       events: [
         {
@@ -46,19 +52,17 @@ const serverlessConfig: Serverless = {
       ]
     },
     validate: {
-      handler: './src/lambdas/create.handler',
+      handler: './src/lambdas/validate.handler',
       environment: {
         TABLE_NAME:
-          process.env.NODE_ENV === Stages.Dev ? tableName : { Ref: 'Table' },
-        QUEUE_URL:
-          process.env.NODE_ENV === Stages.Dev
-            ? `http://localhost:9324/000000000000/${queueName}`
-            : { 'Fn::GetAtt': [queueName, 'QueueUrl'] }
+          process.env.NODE_ENV === Stages.Dev ? tableName : { Ref: 'Table' }
       },
       events: [
         {
           sqs: {
-            arn: { 'Fn::GetAtt': [queueName, 'Arn'] },
+            arn: isDev
+              ? `arn:aws:sqs:region:XXXXXX:${queueName}`
+              : { 'Fn::GetAtt': [queueName, 'Arn'] },
             functionResponseType: 'ReportBatchItemFailures'
           }
         }

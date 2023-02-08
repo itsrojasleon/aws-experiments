@@ -15,6 +15,29 @@ const oldDynamo = new DynamoDBClient({
   })
 });
 
-export const s3 = new S3Client({});
-export const sqs = new SQSClient({});
 export const dynamodb = DynamoDBDocumentClient.from(oldDynamo);
+
+export const s3 = new S3Client({
+  ...(process.env.NODE_ENV === Stages.Dev && {
+    forcePathStyle: true,
+    endpoint: 'http://localhost:4569',
+    region: 'us-east-1',
+    credentials: {
+      accessKeyId: 'S3RVER',
+      secretAccessKey: 'S3RVER'
+    }
+  })
+});
+
+export const sqs = new SQSClient({
+  ...(process.env.NODE_ENV === Stages.Dev && {
+    apiVersion: '2012-11-05',
+    region: 'localhost',
+    endpoint: 'http://0.0.0.0:9324',
+    sslEnabled: false,
+    credentials: {
+      secretAccessKey: 'root',
+      accessKeyId: 'root'
+    }
+  })
+});

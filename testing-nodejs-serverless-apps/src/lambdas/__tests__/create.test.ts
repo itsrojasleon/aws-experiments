@@ -6,6 +6,19 @@ const dynamodbMock = mockClient(dynamodb);
 const sqsMock = mockClient(sqs);
 
 describe('create', () => {
+  it('should return 400', async () => {
+    const event = {
+      body: '!@#$%^&*()'
+    };
+
+    // @ts-ignore
+    const response = await handler(event);
+    // @ts-ignore
+    expect(response.statusCode).toBe(400);
+    // @ts-ignore
+    expect(JSON.parse(response.body).message).toBe('Invalid body');
+  });
+
   it('should return 200', async () => {
     const event = {
       body: JSON.stringify({

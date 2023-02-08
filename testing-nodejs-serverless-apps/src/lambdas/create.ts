@@ -15,8 +15,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
   }
 
   try {
-    // TODO: Check body properties.
-    const body = JSON.parse(event.body || '{}');
+    let body;
+
+    try {
+      body = JSON.parse(event.body || '{}');
+    } catch (err) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ message: 'Invalid body' })
+      };
+    }
 
     const id = generateId();
 
@@ -40,9 +48,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
 
     return {
       statusCode: 200,
-      body: JSON.stringify({
-        message: 'Blog post created successfully'
-      })
+      body: JSON.stringify({ message: 'Blog post created successfully' })
     };
   } catch (error) {
     return {
