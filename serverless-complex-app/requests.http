@@ -1,0 +1,11 @@
+POST http://localhost:3000/development HTTP/1.1
+Content-Type: application/json
+
+{}
+
+###
+
+POST https://etx4j3o5qk.execute-api.us-east-1.amazonaws.com/production HTTP/1.1
+Content-Type: application/json
+
+{}
