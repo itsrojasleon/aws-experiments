@@ -3,7 +3,7 @@ import { Stages } from './src/types';
 
 const IS_DEV = process.env.NODE_ENV === Stages.DEV;
 
-const attachmentsBucketName = 'AttachmentsBucket';
+const attachmentsBucketName = 'AttachmentsBucketName';
 
 const serverlessConfig: AWS = {
   service: 'serverless-complex-app',
@@ -11,30 +11,55 @@ const serverlessConfig: AWS = {
   provider: {
     name: 'aws',
     stage: "${opt:stage, 'development'}",
-    runtime: 'nodejs16.x',
-    iamRoleStatements: [
-      {
-        Effect: 'Allow',
-        Action: ['s3:PutObject'],
-        Resource: { 'Fn::GetAtt': [attachmentsBucketName, 'Arn'] }
+    runtime: IS_DEV ? 'nodejs16.x' : 'nodejs18.x',
+    iam: {
+      role: {
+        statements: [
+          {
+            Effect: 'Allow',
+            Action: ['s3:PutObject'],
+            Resource: '*'
+          }
+        ]
       }
+    },
+    iamManagedPolicies: [
+      'arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole'
     ]
   },
   functions: {
-    hello: {
-      handler: 'src/lambdas/start.handler',
+    parallelUpload: {
+      handler: 'src/lambdas/parallel-upload.handler',
       timeout: 6,
       environment: {
         NODE_ENV: '${self:provider.stage}',
         ATTACHMENTS_BUCKET_NAME: IS_DEV
           ? `${attachmentsBucketName}`
-          : { Ref: attachmentsBucketName }
+          : { Ref: 'AttachmentsBucket' }
       },
       events: [
         {
           http: {
             method: 'post',
-            path: '/'
+            path: '/parallel-upload'
+          }
+        }
+      ]
+    },
+    upload: {
+      handler: 'src/lambdas/upload.handler',
+      timeout: 6,
+      environment: {
+        NODE_ENV: '${self:provider.stage}',
+        ATTACHMENTS_BUCKET_NAME: IS_DEV
+          ? `${attachmentsBucketName}`
+          : { Ref: 'AttachmentsBucket' }
+      },
+      events: [
+        {
+          http: {
+            method: 'post',
+            path: '/upload'
           }
         }
       ]
@@ -68,7 +93,7 @@ const serverlessConfig: AWS = {
   },
   resources: {
     Resources: {
-      [attachmentsBucketName]: {
+      AttachmentsBucket: {
         Type: 'AWS::S3::Bucket',
         Properties: {
           ...(IS_DEV && {

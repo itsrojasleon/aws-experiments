@@ -1,4 +1,4 @@
-import { Upload } from '@aws-sdk/lib-storage';
+import { PutObjectCommand } from '@aws-sdk/client-s3';
 import { APIGatewayProxyHandlerV2 } from 'aws-lambda';
 import { Readable } from 'stream';
 import { s3 } from '../clients';
@@ -15,7 +15,6 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
 
     const fileSize = 128 * 1024 * 1024; // 128 MB
     const chunkSize = 5 * 1024 * 1024; // 5 MB
-    const letter = 'A';
 
     const customReadable = Readable.from({
       async *[Symbol.asyncIterator]() {
@@ -23,31 +22,21 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
         while (generatedBytes < fileSize) {
           const remainingSize = fileSize - generatedBytes;
           const bytesToPush = Math.min(chunkSize, remainingSize);
-          const buff = Buffer.alloc(bytesToPush, letter);
+          const buff = Buffer.alloc(bytesToPush, 'A');
           generatedBytes += bytesToPush;
           yield buff;
         }
       }
     });
 
-    const parallelUpload = new Upload({
-      client: s3,
-      queueSize: 4,
-      partSize: chunkSize,
-      leavePartsOnError: false,
-      params: {
+    const res = await s3.send(
+      new PutObjectCommand({
         Bucket: process.env.ATTACHMENTS_BUCKET_NAME,
         Key: `${generateId()}.txt`,
         Body: customReadable
-      }
-    });
-
-    parallelUpload.on('httpUploadProgress', (progress) => {
-      console.log({ progress });
-    });
-
-    const data = await parallelUpload.done();
-    console.log('upload completed!', { data });
+      })
+    );
+    console.log({ res });
 
     return {
       statusCode: 200,
