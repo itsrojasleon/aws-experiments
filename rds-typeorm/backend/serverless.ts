@@ -7,13 +7,23 @@ const serverlessConfig: AWS = {
     name: 'aws',
     runtime: 'nodejs18.x',
     vpc: {
-      securityGroupIds: [''],
-      subnetIds: ['', '']
+      securityGroupIds: ['${cf:InfraStack.LambdaSecurityGroupId}'],
+      subnetIds: [
+        '${cf:InfraStack.LambdaSubnet1Id}',
+        '${cf:InfraStack.LambdaSubnet2Id}'
+      ]
     }
   },
   functions: {
     create: {
       handler: 'src/lambdas/create.handler',
+      environment: {
+        DB_NAME: '${cf:InfraStack.DatabaseName}',
+        DB_HOST: '${cf:InfraStack.DatabaseHostname}',
+        // We'll use secrets manager to retrieve the username and password
+        // based on the secret ARN.
+        DB_SECRET_ARN: '${cf:InfraStack.DatabaseSecretArn}'
+      },
       events: [
         {
           httpApi: {

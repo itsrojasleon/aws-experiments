@@ -12,11 +12,13 @@ export const handler: APIGatewayProxyHandlerV2 = async () => {
   try {
     if (!process.env.DB_NAME) throw new Error('DB_NAME is not set');
     if (!process.env.DB_HOST) throw new Error('DB_HOST is not set');
-    if (!process.env.DB_SECRET_ID) throw new Error('DB_SECRET_ID is not set');
+    if (!process.env.DB_SECRET_ARN) throw new Error('DB_SECRET_ARN is not set');
+
+    const secretId = process.env.DB_SECRET_ARN.split(':')[6];
 
     const { SecretString } = await secrets.send(
       new GetSecretValueCommand({
-        SecretId: process.env.DB_SECRET_ID
+        SecretId: secretId
       })
     );
 

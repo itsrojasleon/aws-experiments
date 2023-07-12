@@ -2,7 +2,6 @@ package main
 
 import (
 	"os"
-	"strings"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
 	ec2 "github.com/aws/aws-cdk-go/awscdk/v2/awsec2"
@@ -25,19 +24,21 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 
 	vpc := ec2.NewVpc(stack, jsii.String("VPC"), &ec2.VpcProps{
 		MaxAzs: jsii.Number(2),
+		Cidr:   jsii.String("15.0.0.0/16"),
 	})
 
-	lambdaSubnet1 := ec2.NewSubnet(stack, jsii.String("LambdaSubnet1"), &ec2.SubnetProps{
-		VpcId:            vpc.VpcId(),
-		AvailabilityZone: jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
-		CidrBlock:        jsii.String("10.0.0.0/24"),
-	})
+	// TODO: First deploy the vpc and see their default subnets
+	// lambdaSubnet1 := ec2.NewSubnet(stack, jsii.String("LambdaSubnet1"), &ec2.SubnetProps{
+	// 	VpcId:            vpc.VpcId(),
+	// 	AvailabilityZone: jsii.String("us-east-1a"),
+	// 	CidrBlock:        jsii.String("15.0.160.0/20"),
+	// })
 
-	lambdaSubnet2 := ec2.NewSubnet(stack, jsii.String("LambdaSubnet2"), &ec2.SubnetProps{
-		VpcId:            vpc.VpcId(),
-		AvailabilityZone: jsii.String(os.Getenv("CDK_DEFAULT_REGION")),
-		CidrBlock:        jsii.String("10.0.0.0/24"),
-	})
+	// lambdaSubnet2 := ec2.NewSubnet(stack, jsii.String("LambdaSubnet2"), &ec2.SubnetProps{
+	// 	VpcId:            vpc.VpcId(),
+	// 	AvailabilityZone: jsii.String("us-east-1b"),
+	// 	CidrBlock:        jsii.String("15.0.176.0/20"),
+	// })
 
 	databaseSecurityGroup := ec2.NewSecurityGroup(stack, jsii.String("DatabaseSecurityGroup"), &ec2.SecurityGroupProps{
 		Vpc:         vpc,
@@ -83,7 +84,7 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 	secret := secretsmanager.NewSecret(stack, jsii.String("Credentials"), &secretsmanager.SecretProps{
 		SecretName: jsii.String("database-credentials"),
 		GenerateSecretString: &secretsmanager.SecretStringGenerator{
-			SecretStringTemplate: jsii.String(`{"username": "admin"}`),
+			SecretStringTemplate: jsii.String(`{"username": "justme"}`),
 			GenerateStringKey:    jsii.String("password"),
 			IncludeSpace:         jsii.Bool(false),
 			ExcludePunctuation:   jsii.Bool(true),
@@ -105,7 +106,7 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 			},
 		},
 		Instances:          jsii.Number(1),
-		Credentials:        rds.Credentials_FromSecret(secret, jsii.String("admin")),
+		Credentials:        rds.Credentials_FromSecret(secret, jsii.String("justme")),
 		RemovalPolicy:      cdk.RemovalPolicy_DESTROY,
 		DeletionProtection: jsii.Bool(false),
 	})
@@ -115,26 +116,25 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 	// })
 	// database.AddParameterGroup(parameterGroup)
 
-	secretName := strings.Split(*secret.SecretArn(), ":")[6]
-
-	cdk.NewCfnOutput(stack, jsii.String("DatabaseEndpoint"), &cdk.CfnOutputProps{
+	// output database hostname
+	cdk.NewCfnOutput(stack, jsii.String("DatabaseHostname"), &cdk.CfnOutputProps{
 		Value: database.ClusterEndpoint().Hostname(),
 	})
 	cdk.NewCfnOutput(stack, jsii.String("DatabaseName"), &cdk.CfnOutputProps{
 		Value: database.ClusterIdentifier(),
 	})
-	cdk.NewCfnOutput(stack, jsii.String("DatabaseSecretId"), &cdk.CfnOutputProps{
-		Value: &secretName,
+	cdk.NewCfnOutput(stack, jsii.String("DatabaseSecretArn"), &cdk.CfnOutputProps{
+		Value: secret.SecretArn(),
 	})
 	cdk.NewCfnOutput(stack, jsii.String("LambdaSecurityGroupId"), &cdk.CfnOutputProps{
 		Value: lambdaSecurityGroup.SecurityGroupId(),
 	})
-	cdk.NewCfnOutput(stack, jsii.String("LambdaSubnet1"), &cdk.CfnOutputProps{
-		Value: lambdaSubnet1.SubnetId(),
-	})
-	cdk.NewCfnOutput(stack, jsii.String("LambdaSubnet2"), &cdk.CfnOutputProps{
-		Value: lambdaSubnet2.SubnetId(),
-	})
+	// cdk.NewCfnOutput(stack, jsii.String("LambdaSubnet1Id"), &cdk.CfnOutputProps{
+	// 	Value: lambdaSubnet1.SubnetId(),
+	// })
+	// cdk.NewCfnOutput(stack, jsii.String("LambdaSubnet2Id"), &cdk.CfnOutputProps{
+	// 	Value: lambdaSubnet2.SubnetId(),
+	// })
 	return stack
 }
 
