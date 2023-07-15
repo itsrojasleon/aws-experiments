@@ -22,7 +22,7 @@ const serverlessConfig: AWS = {
         DB_HOST: '${cf:InfraStack.DatabaseHostname}',
         // We'll use secrets manager to retrieve the username and password
         // based on the secret ARN.
-        DB_SECRET_ARN: '${cf:InfraStack.DatabaseSecretArn}'
+        DB_SECRET_NAME: '${cf:InfraStack.DatabaseSecretName}'
       },
       events: [
         {

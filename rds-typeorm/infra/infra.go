@@ -123,8 +123,8 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 	cdk.NewCfnOutput(stack, jsii.String("DatabaseName"), &cdk.CfnOutputProps{
 		Value: database.ClusterIdentifier(),
 	})
-	cdk.NewCfnOutput(stack, jsii.String("DatabaseSecretArn"), &cdk.CfnOutputProps{
-		Value: secret.SecretArn(),
+	cdk.NewCfnOutput(stack, jsii.String("DatabaseSecretName"), &cdk.CfnOutputProps{
+		Value: secret.SecretName(),
 	})
 	cdk.NewCfnOutput(stack, jsii.String("LambdaSecurityGroupId"), &cdk.CfnOutputProps{
 		Value: lambdaSecurityGroup.SecurityGroupId(),
