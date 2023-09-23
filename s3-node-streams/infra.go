@@ -4,6 +4,7 @@ import (
 	"os"
 
 	cdk "github.com/aws/aws-cdk-go/awscdk/v2"
+	apigateway "github.com/aws/aws-cdk-go/awscdk/v2/awsapigateway"
 	lambda "github.com/aws/aws-cdk-go/awscdk/v2/awslambda"
 	lambdanodejs "github.com/aws/aws-cdk-go/awscdk/v2/awslambdanodejs"
 	s3 "github.com/aws/aws-cdk-go/awscdk/v2/awss3"
@@ -23,36 +24,41 @@ func NewInfraStack(scope constructs.Construct, id string, props *InfraStackProps
 
 	stack := cdk.NewStack(scope, &id, &sprops)
 
-	bucket := s3.NewBucket(stack, jsii.String("NiceBucket"), &s3.BucketProps{})
+	bucket := s3.NewBucket(stack, jsii.String("bucket"), &s3.BucketProps{})
+	api := apigateway.NewRestApi(stack, jsii.String("restApi"), &apigateway.RestApiProps{})
 
-	lambdanodejs.NewNodejsFunction(
+	streamUploadLambda := lambdanodejs.NewNodejsFunction(
 		stack,
-		jsii.String("uploadStreamLambda"),
+		jsii.String("streamUploadLambda"),
 		&lambdanodejs.NodejsFunctionProps{
 			MemorySize: jsii.Number(128),
 			Timeout:    cdk.Duration_Seconds(jsii.Number(20)),
-			Runtime:    lambda.Runtime_NODEJS_16_X(),
+			Runtime:    lambda.Run(),
 			Handler:    jsii.String("handler"),
-			Entry:      jsii.String("src/lambdas/stream/upload"),
+			Entry:      jsii.String("src/lambdas/stream-upload"),
 			Environment: &map[string]*string{
 				"BUCKET_NAME": bucket.BucketName(),
 			},
 		},
 	)
-	lambdanodejs.NewNodejsFunction(
+	multipartUploadLambda := lambdanodejs.NewNodejsFunction(
 		stack,
-		jsii.String("uploadBufferLambda"),
+		jsii.String("multipartUploadLambda"),
 		&lambdanodejs.NodejsFunctionProps{
 			MemorySize: jsii.Number(128),
 			Timeout:    cdk.Duration_Seconds(jsii.Number(20)),
 			Runtime:    lambda.Runtime_NODEJS_16_X(),
 			Handler:    jsii.String("handler"),
-			Entry:      jsii.String("src/lambdas/buffer/upload"),
+			Entry:      jsii.String("src/lambdas/multipart-upload"),
 			Environment: &map[string]*string{
 				"BUCKET_NAME": bucket.BucketName(),
 			},
 		},
 	)
+
+	apix := apigateway.NewLambdaRestApi(stack, jsii.String("myapi"), &apigateway.LambdaRestApiProps{
+		Handler: multipartUploadLambda,
+	})
 
 	return stack
 }
